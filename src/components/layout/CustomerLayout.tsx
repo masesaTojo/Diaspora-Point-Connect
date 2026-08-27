@@ -29,10 +29,12 @@ export function CustomerLayout() {
       path: '/shop',
       hasDropdown: true,
       dropdownItems: [
-        { name: 'Gifts & Hampers', path: '/shop/gifts' },
-        { name: 'Flowers & Cakes', path: '/shop/flowers' },
-        { name: 'Shop for Home', path: '/shop/home' },
-        { name: 'Made in Kenya', path: '/shop/kenya' },
+        { name: 'Gifts & Hampers', path: '/shop/category/gifts' },
+        { name: 'Flowers & Cakes', path: '/shop/category/flowers' },
+        { name: 'Shop for Home', path: '/shop/category/home' },
+        { name: 'Made in Kenya', path: '/shop/category/kenya' },
+        { name: 'Electronics & Appliances', path: '/shop/category/electronics' },
+        { name: 'Eco & Sustainable', path: '/shop/category/eco' },
       ]
     },
     { name: 'Gift Builder', path: '/gift-builder' },
@@ -224,8 +226,9 @@ export function CustomerLayout() {
           <div>
             <h4 className="font-display font-semibold mb-4 text-lg">Shop</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><Link to="/shop/category/gifts-hampers" className="hover:text-white transition-colors">Gifts & Hampers</Link></li>
-              <li><Link to="/shop/category/flowers-cakes" className="hover:text-white transition-colors">Flowers & Cakes</Link></li>
+              <li><Link to="/shop/category/gifts" className="hover:text-white transition-colors">Gifts & Hampers</Link></li>
+              <li><Link to="/shop/category/flowers" className="hover:text-white transition-colors">Flowers & Cakes</Link></li>
+              <li><Link to="/shop/category/electronics" className="hover:text-white transition-colors">Electronics & Appliances</Link></li>
               <li><Link to="/shop/category/family-support" className="hover:text-white transition-colors">Family Support</Link></li>
             </ul>
           </div>

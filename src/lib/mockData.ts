@@ -15,9 +15,7 @@ export const mockProducts: Partial<Product>[] = [
     id: "p1",
     name: "Classic Red Roses Bouquet",
     slug: "classic-red-roses",
-    description: "A beautiful arrangement of 24 premium red roses, grown in Kenya. Perfectly tied with a ribbon and presented in an elegant wrap.",
-    price: 45.00,
-    images: [
+    description: "A beautiful arrangement of 24 premium red roses, grown in Kenya. Perfectly tied with a ribbon and presented in an elegant wrap.",    price: 45.00,    salePrice: 39.99,    images: [
       "https://images.unsplash.com/photo-1591886960571-74d43a9d4166?auto=format&fit=crop&w=600&q=80",
       "https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&w=600&q=80"
     ],
@@ -91,7 +89,7 @@ export const mockProducts: Partial<Product>[] = [
     collections: ["Eco Friendly"],
     rating: 5.0,
     reviewCount: 45,
-    availability: "IN_STOCK",
+    availability: "OUT_OF_STOCK",
     deliveryZones: ["Nationwide"],
     whatsIncluded: ["1x Leather Tote Bag", "Dust Bag"],
   },

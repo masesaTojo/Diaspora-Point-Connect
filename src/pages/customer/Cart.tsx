@@ -17,6 +17,7 @@ export default function Cart() {
     };
   }).filter(item => item.product); // Filter out any invalid items
 
+  const hasOutOfStock = cartItemsWithDetails.some(item => item.product?.availability === 'OUT_OF_STOCK');
   const subtotal = cartItemsWithDetails.reduce((sum, item) => {
     const price = item.product?.salePrice || item.product?.price || 0;
     const itemTotal = price * item.quantity;
@@ -35,7 +36,12 @@ export default function Cart() {
         <h2 className="text-3xl font-display font-bold text-navy mb-4">Your Cart is Empty</h2>
         <p className="text-text-muted mb-8 max-w-md">Looks like you haven't added any gifts yet. Discover our premium selection of hampers, flowers, and more.</p>
         <Link to="/shop">
-          <Button size="lg">Start Shopping</Button>
+              {hasOutOfStock && (
+                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 border border-red-100">
+                  One or more items in your cart are out of stock. Please remove them to proceed.
+                </div>
+              )}
+          <Button disabled={hasOutOfStock} size="lg">Start Shopping</Button>
         </Link>
       </div>
     );
@@ -145,7 +151,12 @@ export default function Cart() {
                 <p className="text-xs text-text-muted mt-1 text-right">Includes taxes</p>
               </div>
 
-              <Button 
+              {hasOutOfStock && (
+                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 border border-red-100">
+                  One or more items in your cart are out of stock. Please remove them to proceed.
+                </div>
+              )}
+              <Button disabled={hasOutOfStock} 
                 className="w-full text-lg group" 
                 size="lg"
                 onClick={() => navigate('/checkout')}

@@ -126,9 +126,7 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            <div className="text-3xl font-bold text-navy mb-6">
-              ${product.price?.toFixed(2)}
-            </div>
+            <div className="text-3xl font-bold text-navy mb-6">              {product.salePrice ? (                <div className="flex items-center gap-3">                  <span className="text-red-600">${product.salePrice.toFixed(2)}</span>                  <span className="text-xl text-text-muted line-through">${product.price?.toFixed(2)}</span>                </div>              ) : (                <span>${product.price?.toFixed(2)}</span>              )}            </div>
 
             <p className="text-text text-lg leading-relaxed mb-8">
               {product.description}
@@ -243,8 +241,8 @@ export default function ProductDetail() {
                   <Plus className="w-5 h-5" />
                 </button>
               </div>
-              <Button onClick={handleAddToCart} size="lg" className="flex-1 text-lg">
-                Add to Cart
+              <Button onClick={handleAddToCart} size="lg" className="flex-1 text-lg" disabled={product.availability === 'OUT_OF_STOCK'}>
+                {product.availability === 'OUT_OF_STOCK' ? 'Out of Stock' : 'Add to Cart'}
               </Button>
             </div>
             <p className="text-center text-sm text-text-muted mt-4">

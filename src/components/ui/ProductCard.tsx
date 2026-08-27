@@ -76,13 +76,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </div>
         )}
 
-        <div className="mt-auto flex items-center justify-between">
-          <div className="text-xl font-bold text-navy">
-            ${product.price?.toFixed(2)}
-          </div>
-          <button 
+        <div className="mt-auto flex items-center justify-between">          <div className="text-xl font-bold text-navy">            {product.salePrice ? (              <div className="flex items-center gap-2">                <span className="text-red-600">${product.salePrice.toFixed(2)}</span>                <span className="text-sm text-text-muted line-through">${product.price?.toFixed(2)}</span>              </div>            ) : (              <span>${product.price?.toFixed(2)}</span>            )}          </div>          <button 
             onClick={handleAddToCart}
-            className="h-10 w-10 rounded-full bg-neutral-100 flex items-center justify-center text-navy hover:bg-dpc-blue hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-dpc-blue focus:ring-offset-2"
+            disabled={product.availability === 'OUT_OF_STOCK'} className={`h-10 w-10 rounded-full flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-dpc-blue focus:ring-offset-2 ${product.availability === 'OUT_OF_STOCK' ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed' : 'bg-neutral-100 text-navy hover:bg-dpc-blue hover:text-white'}`}
           >
             <ShoppingBag className="w-5 h-5" />
           </button>

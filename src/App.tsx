@@ -45,6 +45,11 @@ export default function App() {
             <Route path="checkout" element={<Checkout />} />
             <Route path="account" element={<Account />} />
             <Route path="gift-builder" element={<GiftBuilder />} />
+            <Route path="support" element={<div className="p-12 text-center text-text-muted">Support Placeholder</div>} />
+            <Route path="track" element={<div className="p-12 text-center text-text-muted">Track Order Placeholder</div>} />
+            <Route path="faq" element={<div className="p-12 text-center text-text-muted">FAQ Placeholder</div>} />
+            <Route path="shipping" element={<div className="p-12 text-center text-text-muted">Shipping Placeholder</div>} />
+            <Route path="returns" element={<div className="p-12 text-center text-text-muted">Returns Placeholder</div>} />
           </Route>
 
         {/* Control Center Routes */}
