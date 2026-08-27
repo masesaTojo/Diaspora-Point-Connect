@@ -1,3 +1,13 @@
+export type Permission =
+  | "VIEW"
+  | "CREATE"
+  | "EDIT"
+  | "DELETE"
+  | "APPROVE"
+  | "REFUND"
+  | "EXPORT"
+  | "PUBLISH";
+
 export type Role =
   | "SUPER_ADMIN"
   | "STORE_MANAGER"
@@ -8,6 +18,18 @@ export type Role =
   | "DELIVERY_MANAGER"
   | "SUPPORT_AGENT"
   | "CUSTOMER";
+
+export interface AuditLogEntry {
+  id: string;
+  userId: string;
+  userEmail: string;
+  action: string;
+  entity: string;
+  entityId?: string;
+  oldValue?: string;
+  newValue?: string;
+  timestamp: string;
+}
 
 export interface User {
   id: string;

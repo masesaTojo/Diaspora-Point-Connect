@@ -16,13 +16,13 @@ export default function GiftBuilder() {
 
   const eligibleProducts = mockProducts.filter(p => mockGiftBuilderConfig.eligibleProductIds.includes(p.id));
 
-  const toggleProduct = (product: Product) => {
+  const toggleProduct = (product: Partial<Product>) => {
     const isSelected = selectedProducts.find(p => p.id === product.id);
     if (isSelected) {
       setSelectedProducts(selectedProducts.filter(p => p.id !== product.id));
     } else {
       if (selectedProducts.length < mockGiftBuilderConfig.maxItems) {
-        setSelectedProducts([...selectedProducts, product]);
+        setSelectedProducts([...selectedProducts, product as Product]);
       }
     }
   };

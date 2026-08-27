@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { CustomerLayout } from './components/layout/CustomerLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
 import { ShopProvider } from './contexts/ShopContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 // Customer Pages
 import Home from './pages/customer/Home';
@@ -24,13 +25,16 @@ import Suppliers from './pages/admin/Suppliers';
 import Marketing from './pages/admin/Marketing';
 import Content from './pages/admin/Content';
 import GiftBuilderManager from './pages/admin/GiftBuilderManager';
+import Analytics from './pages/admin/Analytics';
+import Settings from './pages/admin/Settings';
 
 export default function App() {
   return (
-    <ShopProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Customer Facing Routes */}
+    <AuthProvider>
+      <ShopProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Customer Facing Routes */}
           <Route path="/" element={<CustomerLayout />}>
             <Route index element={<Home />} />
             <Route path="shop" element={<Shop />} />
@@ -41,8 +45,6 @@ export default function App() {
             <Route path="checkout" element={<Checkout />} />
             <Route path="account" element={<Account />} />
             <Route path="gift-builder" element={<GiftBuilder />} />
-            <Route path="discover" element={<div className="p-12 text-center text-text-muted">Discover Placeholder</div>} />
-            <Route path="services" element={<div className="p-12 text-center text-text-muted">Services Placeholder</div>} />
           </Route>
 
         {/* Control Center Routes */}
@@ -57,14 +59,15 @@ export default function App() {
           <Route path="marketing" element={<Marketing />} />
           <Route path="content" element={<Content />} />
           <Route path="gift-builder" element={<GiftBuilderManager />} />
-          <Route path="analytics" element={<div className="text-center py-12 text-text-muted">Analytics Dashboard Placeholder</div>} />
-          <Route path="settings" element={<div className="text-center py-12 text-text-muted">Settings Placeholder</div>} />
+          <Route path="analytics" element={<Analytics />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
 
         {/* 404 Route */}
         <Route path="*" element={<div className="min-h-screen flex items-center justify-center text-xl text-navy">404 - Page Not Found</div>} />
       </Routes>
-    </BrowserRouter>
-  </ShopProvider>
+        </BrowserRouter>
+      </ShopProvider>
+    </AuthProvider>
   );
 }

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
+import { useAuth } from '@/src/contexts/AuthContext';
 import { 
   LayoutDashboard, 
   ShoppingBag, 
@@ -35,6 +36,19 @@ const navItems = [
 
 export function AdminLayout() {
   const location = useLocation();
+  const { currentUser, logout } = useAuth();
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-neutral-bg flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-xl shadow-sm text-center max-w-sm">
+          <h2 className="text-xl font-bold text-navy mb-4">Admin Authentication Required</h2>
+          <p className="text-sm text-text-muted mb-6">Please log in as an administrator to access the Control Center.</p>
+          <Link to="/" className="text-dpc-blue font-bold hover:underline">Return to Store</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-bg flex">
@@ -69,10 +83,10 @@ export function AdminLayout() {
           </nav>
         </div>
         <div className="p-4 border-t border-navy-dark">
-          <Link to="/" className="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-navy-dark hover:text-white transition-colors">
+          <button onClick={() => { logout(); window.location.href = '/'; }} className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-navy-dark hover:text-white transition-colors">
             <LogOut className="mr-3 h-5 w-5" />
-            Back to Store
-          </Link>
+            Sign Out
+          </button>
         </div>
       </aside>
 
@@ -88,8 +102,8 @@ export function AdminLayout() {
               <Bell className="h-5 w-5" />
               <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-dpc-yellow"></span>
             </button>
-            <div className="h-8 w-8 rounded-full bg-dpc-blue text-white flex items-center justify-center font-semibold text-sm">
-              SA
+            <div className="h-8 w-8 rounded-full bg-dpc-blue text-white flex items-center justify-center font-semibold text-sm" title={currentUser.email}>
+              {currentUser.firstName.charAt(0)}{currentUser.lastName.charAt(0)}
             </div>
           </div>
         </header>

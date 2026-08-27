@@ -35,10 +35,8 @@ export function CustomerLayout() {
         { name: 'Made in Kenya', path: '/shop/kenya' },
       ]
     },
-    { name: 'Discover', path: '/discover' },
     { name: 'Gift Builder', path: '/gift-builder' },
-    { name: 'Family Support', path: '/shop/family-support' },
-    { name: 'Services', path: '/services' },
+    { name: 'Family Support', path: '/shop/category/family-support' },
   ];
 
   return (
@@ -226,9 +224,9 @@ export function CustomerLayout() {
           <div>
             <h4 className="font-display font-semibold mb-4 text-lg">Shop</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><Link to="/shop/gifts-hampers" className="hover:text-white transition-colors">Gifts & Hampers</Link></li>
-              <li><Link to="/shop/flowers-cakes" className="hover:text-white transition-colors">Flowers & Cakes</Link></li>
-              <li><Link to="/shop/family-support" className="hover:text-white transition-colors">Family Support</Link></li>
+              <li><Link to="/shop/category/gifts-hampers" className="hover:text-white transition-colors">Gifts & Hampers</Link></li>
+              <li><Link to="/shop/category/flowers-cakes" className="hover:text-white transition-colors">Flowers & Cakes</Link></li>
+              <li><Link to="/shop/category/family-support" className="hover:text-white transition-colors">Family Support</Link></li>
             </ul>
           </div>
           <div>

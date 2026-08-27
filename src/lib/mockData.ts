@@ -305,3 +305,25 @@ export const mockGiftBuilderConfig: any = {
   bundleDiscountPercentage: 10,
   isActive: true,
 };
+
+export const mockUsers: any[] = [
+  { id: "u1", email: "admin@dpc.com", firstName: "Super", lastName: "Admin", roles: ["SUPER_ADMIN"], createdAt: "2023-01-01T00:00:00Z", updatedAt: "2023-01-01T00:00:00Z" },
+  { id: "u2", email: "store@dpc.com", firstName: "Store", lastName: "Manager", roles: ["STORE_MANAGER"], createdAt: "2023-01-01T00:00:00Z", updatedAt: "2023-01-01T00:00:00Z" },
+  { id: "u3", email: "finance@dpc.com", firstName: "Finance", lastName: "Manager", roles: ["FINANCE_MANAGER"], createdAt: "2023-01-01T00:00:00Z", updatedAt: "2023-01-01T00:00:00Z" },
+  { id: "u4", email: "delivery@dpc.com", firstName: "Delivery", lastName: "Manager", roles: ["DELIVERY_MANAGER"], createdAt: "2023-01-01T00:00:00Z", updatedAt: "2023-01-01T00:00:00Z" }
+];
+
+export const mockAuditLogs: any[] = [
+  { id: "log1", userId: "u1", userEmail: "admin@dpc.com", action: "LOGIN", entity: "Auth", timestamp: new Date().toISOString() },
+  { id: "log2", userId: "u2", userEmail: "store@dpc.com", action: "UPDATE", entity: "Product", entityId: "p1", newValue: "Price changed to 35.00", timestamp: new Date(Date.now() - 3600000).toISOString() },
+  { id: "log3", userId: "u3", userEmail: "finance@dpc.com", action: "APPROVE_REFUND", entity: "Order", entityId: "o2", timestamp: new Date(Date.now() - 7200000).toISOString() },
+  { id: "log4", userId: "u4", userEmail: "delivery@dpc.com", action: "ASSIGN_DRIVER", entity: "Order", entityId: "o1", newValue: "Assigned to drv1", timestamp: new Date(Date.now() - 86400000).toISOString() },
+];
+
+export const mockOrders: any[] = [
+  { id: "o1", customerId: "c1", total: 150.00, deliveryFee: 15.00, deliveryAddress: { city: "Nairobi" }, createdAt: new Date(Date.now() - 86400000).toISOString() },
+  { id: "o2", customerId: "c2", total: 85.50, deliveryFee: 10.00, deliveryAddress: { city: "Nairobi" }, createdAt: new Date(Date.now() - 172800000).toISOString() },
+  { id: "o3", customerId: "c3", total: 320.00, deliveryFee: 25.00, deliveryAddress: { city: "Mombasa" }, createdAt: new Date(Date.now() - 432000000).toISOString() },
+  { id: "o4", customerId: "c1", total: 50.00, deliveryFee: 10.00, deliveryAddress: { city: "Nakuru" }, createdAt: new Date(Date.now() - 864000000).toISOString() },
+];
+
