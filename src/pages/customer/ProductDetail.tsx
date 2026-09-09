@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Star, Truck, Calendar, Gift, Heart, Plus, Minus, CheckCircle, Info, User } from 'lucide-react';
+import { Star, Truck, Calendar, Gift, Heart, Plus, Minus, CheckCircle, Info, User, AlertCircle } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Badge';
 import { ProductCard } from '@/src/components/ui/ProductCard';
-import { mockProducts, mockRecipients } from '@/src/lib/mockData';
+import { mockRecipients } from '@/src/lib/mockData';
 import { useShop } from '@/src/contexts/ShopContext';
 
 export default function ProductDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const { addToCart, toggleWishlist, wishlist } = useShop();
+  const { products, addToCart, toggleWishlist, wishlist } = useShop();
   
-  const product = mockProducts.find(p => p.slug === slug);
+  const product = products.find(p => p.slug === slug || p.id === slug);
   
   const [activeImage, setActiveImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
@@ -25,7 +25,7 @@ export default function ProductDetail() {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-4">
         <h2 className="text-3xl font-display font-bold text-navy mb-4">Product Not Found</h2>
-        <p className="text-text-muted mb-8">The product you are looking for does not exist or has been removed.</p>
+        <p className="text-text-muted mb-8">The product you are looking for does not exist or has been removed from our catalog.</p>
         <Link to="/shop">
           <Button>Return to Shop</Button>
         </Link>
@@ -35,12 +35,15 @@ export default function ProductDetail() {
 
   const productId = product.id || '';
   const isWishlisted = wishlist.includes(productId);
+  const isOutOfStock = product.availability === 'OUT_OF_STOCK' || (typeof product.inventory === 'number' && product.inventory <= 0);
+  const isLowStock = !isOutOfStock && typeof product.inventory === 'number' && product.inventory > 0 && product.inventory <= 5;
 
-  const relatedProducts = mockProducts
-    .filter(p => p.primaryCategoryId === product.primaryCategoryId && p.id !== product.id)
+  const relatedProducts = products
+    .filter(p => p.primaryCategoryId === product.primaryCategoryId && p.id !== product.id && p.status !== 'ARCHIVED')
     .slice(0, 4);
 
   const handleAddToCart = () => {
+    if (isOutOfStock) return;
     addToCart({
       productId,
       quantity,
@@ -83,6 +86,8 @@ export default function ProductDetail() {
               <div className="absolute top-4 left-4 flex flex-col gap-2">
                 {product.isBestseller && <Badge className="bg-dpc-yellow text-navy">Bestseller</Badge>}
                 {product.isNewArrival && <Badge className="bg-dpc-blue text-white">New</Badge>}
+                {isOutOfStock && <Badge className="bg-red-600 text-white">Out of Stock</Badge>}
+                {isLowStock && <Badge className="bg-amber-600 text-white">Only {product.inventory} Left</Badge>}
               </div>
               <button 
                 onClick={() => toggleWishlist(productId)}
@@ -120,10 +125,22 @@ export default function ProductDetail() {
                   <span className="text-text-muted">({product.reviewCount} reviews)</span>
                 </div>
               )}
-              <div className="flex items-center gap-1 text-green-600 text-sm font-medium">
-                <CheckCircle className="w-4 h-4" />
-                {product.availability === 'IN_STOCK' ? 'In Stock' : 'Pre-order'}
-              </div>
+              {isOutOfStock ? (
+                <div className="flex items-center gap-1.5 text-red-600 text-sm font-semibold">
+                  <AlertCircle className="w-4 h-4" />
+                  Out of Stock
+                </div>
+              ) : isLowStock ? (
+                <div className="flex items-center gap-1.5 text-amber-700 text-sm font-semibold">
+                  <AlertCircle className="w-4 h-4" />
+                  Low Stock ({product.inventory} left)
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-green-600 text-sm font-medium">
+                  <CheckCircle className="w-4 h-4" />
+                  In Stock & Ready for Delivery
+                </div>
+              )}
             </div>
 
             <div className="text-3xl font-bold text-navy mb-6">              {product.salePrice ? (                <div className="flex items-center gap-3">                  <span className="text-red-600">${product.salePrice.toFixed(2)}</span>                  <span className="text-xl text-text-muted line-through">${product.price?.toFixed(2)}</span>                </div>              ) : (                <span>${product.price?.toFixed(2)}</span>              )}            </div>
@@ -241,8 +258,8 @@ export default function ProductDetail() {
                   <Plus className="w-5 h-5" />
                 </button>
               </div>
-              <Button onClick={handleAddToCart} size="lg" className="flex-1 text-lg" disabled={product.availability === 'OUT_OF_STOCK'}>
-                {product.availability === 'OUT_OF_STOCK' ? 'Out of Stock' : 'Add to Cart'}
+              <Button onClick={handleAddToCart} size="lg" className="flex-1 text-lg" disabled={isOutOfStock}>
+                {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
               </Button>
             </div>
             <p className="text-center text-sm text-text-muted mt-4">

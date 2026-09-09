@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { mockProducts, mockGiftBuilderConfig } from '@/src/lib/mockData';
+import { mockGiftBuilderConfig } from '@/src/lib/mockData';
 import { Product } from '@/src/types';
 import { PackageOpen, Gift, Check, ArrowRight } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
@@ -7,42 +7,42 @@ import { useShop } from '@/src/contexts/ShopContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function GiftBuilder() {
-  const { addToCart } = useShop();
+  const { addToCart, products, giftConfig } = useShop();
   const navigate = useNavigate();
   
   const [step, setStep] = useState(1);
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
   const [personalization, setPersonalization] = useState({ to: '', from: '', message: '' });
 
-  const eligibleProducts = mockProducts.filter(p => mockGiftBuilderConfig.eligibleProductIds.includes(p.id));
+  const activeConfig = giftConfig || mockGiftBuilderConfig;
+  const eligibleProducts = products.filter(p => 
+    p.status !== 'ARCHIVED' && 
+    (activeConfig.eligibleProductIds?.length ? activeConfig.eligibleProductIds.includes(p.id) : true)
+  );
 
   const toggleProduct = (product: Partial<Product>) => {
     const isSelected = selectedProducts.find(p => p.id === product.id);
     if (isSelected) {
       setSelectedProducts(selectedProducts.filter(p => p.id !== product.id));
     } else {
-      if (selectedProducts.length < mockGiftBuilderConfig.maxItems) {
+      if (selectedProducts.length < activeConfig.maxItems) {
         setSelectedProducts([...selectedProducts, product as Product]);
       }
     }
   };
 
-  const calculateSubtotal = () => selectedProducts.reduce((sum, p) => sum + (p.salePrice || p.price), 0);
-  const discount = (calculateSubtotal() * mockGiftBuilderConfig.bundleDiscountPercentage) / 100;
+  const calculateSubtotal = () => selectedProducts.reduce((sum, p) => sum + (p.salePrice || p.price || 0), 0);
+  const discount = (calculateSubtotal() * activeConfig.bundleDiscountPercentage) / 100;
   const total = calculateSubtotal() - discount;
 
   const handleAddToCart = () => {
-    // In a real app, we might add this as a single "Bundle" item, but for now we'll add items individually 
-    // or as a grouped item structure if supported. We'll simulate adding the items.
     selectedProducts.forEach(p => {
       addToCart({
-        id: `bundle-${Date.now()}-${p.id}`,
         productId: p.id,
-        productName: `[Gift Box] ${p.name}`,
-        price: (p.salePrice || p.price) * (1 - mockGiftBuilderConfig.bundleDiscountPercentage/100),
         quantity: 1,
-        image: p.images[0],
-        customMessage: personalization.message
+        recipient: personalization.to || undefined,
+        giftMessage: personalization.message ? `${personalization.message}${personalization.from ? ` (From: ${personalization.from})` : ''}` : undefined,
+        includeGreetingCard: true
       });
     });
     navigate('/cart');
@@ -57,7 +57,7 @@ export default function GiftBuilder() {
             <PackageOpen className="w-8 h-8" />
           </div>
           <h1 className="text-4xl font-display font-bold text-navy mb-4">Custom Gift Builder</h1>
-          <p className="text-lg text-text-muted">Curate the perfect box for your loved ones. Get {mockGiftBuilderConfig.bundleDiscountPercentage}% off when you build a bundle!</p>
+          <p className="text-lg text-text-muted">Curate the perfect box for your loved ones. Get {activeConfig.bundleDiscountPercentage}% off when you build a bundle!</p>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">

@@ -13,6 +13,8 @@ import Cart from './pages/customer/Cart';
 import Checkout from './pages/customer/Checkout';
 import Account from './pages/customer/Account';
 import GiftBuilder from './pages/customer/GiftBuilder';
+import Rentals from './pages/customer/Rentals';
+import Advertise from './pages/customer/Advertise';
 
 // Admin Pages
 import Dashboard from './pages/admin/Dashboard';
@@ -45,6 +47,9 @@ export default function App() {
             <Route path="checkout" element={<Checkout />} />
             <Route path="account" element={<Account />} />
             <Route path="gift-builder" element={<GiftBuilder />} />
+            <Route path="rentals" element={<Rentals />} />
+            <Route path="advertise" element={<Advertise />} />
+            <Route path="advertisers" element={<Advertise />} />
             <Route path="support" element={<div className="p-12 text-center text-text-muted">Support Placeholder</div>} />
             <Route path="track" element={<div className="p-12 text-center text-text-muted">Track Order Placeholder</div>} />
             <Route path="faq" element={<div className="p-12 text-center text-text-muted">FAQ Placeholder</div>} />

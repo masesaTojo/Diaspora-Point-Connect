@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Search, Menu, X, ChevronDown, Heart } from 'lucide-react';
+import { ShoppingCart, User, Search, Menu, X, ChevronDown, Heart, Home, Award, Sparkles } from 'lucide-react';
 import { Button, buttonVariants } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import { cn } from '@/src/lib/utils';
@@ -13,7 +13,7 @@ export function CustomerLayout() {
   
   const location = useLocation();
   const navigate = useNavigate();
-  const { cartCount, wishlist } = useShop();
+  const { cartCount, wishlist, categories } = useShop();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,16 +29,41 @@ export function CustomerLayout() {
       path: '/shop',
       hasDropdown: true,
       dropdownItems: [
-        { name: 'Gifts & Hampers', path: '/shop/category/gifts' },
-        { name: 'Flowers & Cakes', path: '/shop/category/flowers' },
-        { name: 'Shop for Home', path: '/shop/category/home' },
-        { name: 'Made in Kenya', path: '/shop/category/kenya' },
-        { name: 'Electronics & Appliances', path: '/shop/category/electronics' },
-        { name: 'Eco & Sustainable', path: '/shop/category/eco' },
+        ...categories.map(cat => ({
+          name: cat.name,
+          path: `/shop/category/${cat.slug}`
+        })),
+        { name: 'House Rentals in Kenya', path: '/rentals' },
+        { name: 'Verified Diaspora Advertisers', path: '/advertise' },
       ]
     },
-    { name: 'Gift Builder', path: '/gift-builder' },
+    { 
+      name: 'House Rentals', 
+      path: '/rentals',
+      hasDropdown: true,
+      dropdownItems: [
+        { name: 'All Rentals in Kenya', path: '/rentals' },
+        { name: 'Nairobi Serviced Stays', path: '/rentals?city=Nairobi' },
+        { name: 'Mombasa Coastal Villas', path: '/rentals?city=Mombasa' },
+        { name: 'Naivasha Holiday Cottages', path: '/rentals?city=Naivasha' },
+        { name: 'Diani Beach Retreats', path: '/rentals?city=Diani Beach' },
+        { name: 'List Your Property (Host)', path: '/rentals#host' },
+      ]
+    },
+    { 
+      name: 'Advertisers', 
+      path: '/advertise',
+      hasDropdown: true,
+      dropdownItems: [
+        { name: 'Verified Partner Directory', path: '/advertise' },
+        { name: 'Banking & Diaspora Mortgages', path: '/advertise?cat=Banking' },
+        { name: 'Verified Land & Real Estate', path: '/advertise?cat=RealEstate' },
+        { name: 'Building & Construction Supplies', path: '/advertise?cat=Building' },
+        { name: 'Advertise With Us (Media Kit)', path: '/advertise#packages' },
+      ]
+    },
     { name: 'Family Support', path: '/shop/category/family-support' },
+    { name: 'Gift Builder', path: '/gift-builder' },
   ];
 
   return (
@@ -211,6 +236,84 @@ export function CustomerLayout() {
         )}
       </header>
 
+      {/* Sub-Navigation Bar */}
+      <div className="bg-neutral-50/95 border-b border-neutral-200 sticky top-20 z-40 backdrop-blur-xs">
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between text-xs py-2 font-medium">
+          <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 overflow-x-auto scrollbar-none py-0.5 w-full lg:w-auto">
+            <Link 
+              to="/rentals" 
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all whitespace-nowrap",
+                location.pathname.startsWith('/rentals')
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "bg-white text-navy border border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+              )}
+            >
+              <Home className="w-3.5 h-3.5 text-emerald-500" />
+              <span>House Rentals</span>
+              <span className={cn("text-[10px] font-bold px-1.5 py-0.2 rounded-full", location.pathname.startsWith('/rentals') ? "bg-white/25 text-white" : "bg-emerald-100 text-emerald-800")}>New</span>
+            </Link>
+
+            <Link 
+              to="/advertise" 
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all whitespace-nowrap",
+                location.pathname.startsWith('/advertise') || location.pathname.startsWith('/advertisers')
+                  ? "bg-navy text-white shadow-xs"
+                  : "bg-white text-navy border border-amber-300 hover:bg-amber-50 hover:text-navy"
+              )}
+            >
+              <Award className="w-3.5 h-3.5 text-amber-500" />
+              <span>Verified Advertisers</span>
+            </Link>
+
+            <div className="h-4 w-px bg-neutral-300 mx-1 shrink-0 hidden sm:block" />
+
+            <Link 
+              to="/shop/category/gifts" 
+              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/gifts' ? "text-dpc-blue font-bold bg-white" : "text-text-muted hover:text-navy")}
+            >
+              Gifts & Hampers
+            </Link>
+            <Link 
+              to="/shop/category/flowers" 
+              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/flowers' ? "text-dpc-blue font-bold bg-white" : "text-text-muted hover:text-navy")}
+            >
+              Flowers & Cakes
+            </Link>
+            <Link 
+              to="/shop/category/home" 
+              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/home' ? "text-dpc-blue font-bold bg-white" : "text-text-muted hover:text-navy")}
+            >
+              Shop for Home
+            </Link>
+            <Link 
+              to="/shop/category/family-support" 
+              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/family-support' ? "text-dpc-blue font-bold bg-white" : "text-text-muted hover:text-navy")}
+            >
+              Family Support
+            </Link>
+            <Link 
+              to="/shop/category/kenya" 
+              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/kenya' ? "text-dpc-blue font-bold bg-white" : "text-text-muted hover:text-navy")}
+            >
+              Made in Kenya
+            </Link>
+            <Link 
+              to="/gift-builder" 
+              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/gift-builder' ? "text-dpc-blue font-bold bg-white" : "text-text-muted hover:text-navy")}
+            >
+              Custom Gift Box
+            </Link>
+          </div>
+
+          <div className="hidden xl:flex items-center gap-2 text-text-muted text-[11px] shrink-0 pl-4">
+            <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            <span>M-Pesa, Card & Escrow Secured</span>
+          </div>
+        </div>
+      </div>
+
       {/* Main Content */}
       <main className="flex-1">
         <Outlet />
@@ -233,18 +336,28 @@ export function CustomerLayout() {
             </ul>
           </div>
           <div>
+            <h4 className="font-display font-semibold mb-4 text-lg">Services & Rentals</h4>
+            <ul className="space-y-2 text-sm text-gray-400">
+              <li><Link to="/rentals" className="hover:text-white transition-colors flex items-center gap-1.5"><span className="text-dpc-yellow">●</span> House Rentals in Kenya</Link></li>
+              <li><Link to="/advertise" className="hover:text-white transition-colors">Verified Advertisers</Link></li>
+              <li><Link to="/advertise" className="hover:text-white transition-colors">Advertise With Us</Link></li>
+              <li><Link to="/shop/category/family-support" className="hover:text-white transition-colors">Family Essentials Support</Link></li>
+            </ul>
+          </div>
+          <div>
             <h4 className="font-display font-semibold mb-4 text-lg">Customer Care</h4>
             <ul className="space-y-2 text-sm text-gray-400">
               <li><Link to="/faq" className="hover:text-white transition-colors">FAQ</Link></li>
               <li><Link to="/shipping" className="hover:text-white transition-colors">Shipping & Delivery</Link></li>
               <li><Link to="/returns" className="hover:text-white transition-colors">Returns Policy</Link></li>
+              <li><Link to="/admin" className="text-dpc-yellow hover:underline">Admin Login</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="font-display font-semibold mb-4 text-lg">Control Center</h4>
-            <p className="text-sm text-gray-400 mb-4">Staff and Partner Access</p>
-            <Link to="/admin" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-              Admin Login
+            <h4 className="font-display font-semibold mb-4 text-lg">Partner With Us</h4>
+            <p className="text-sm text-gray-400 mb-4">Are you a Kenyan bank, developer, or service provider?</p>
+            <Link to="/advertise" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+              Partner & Advertise
             </Link>
           </div>
         </div>

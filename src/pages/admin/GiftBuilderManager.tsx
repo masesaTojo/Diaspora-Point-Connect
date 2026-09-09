@@ -1,69 +1,362 @@
-import React, { useState } from 'react';
-import { mockGiftBuilderConfig, mockProducts } from '@/src/lib/mockData';
-import { Settings, Plus, X, Package } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { GiftBuilderConfig, Product } from '@/src/types';
+import { getStoredGiftConfig, saveStoredGiftConfig, getStoredProducts } from '@/src/lib/adminStorage';
+import { Settings, Plus, X, Package, Check, Layers, Sparkles, CheckSquare, Square } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 
 export default function GiftBuilderManager() {
-  const [config, setConfig] = useState(mockGiftBuilderConfig);
+  const [config, setConfig] = useState<GiftBuilderConfig>({
+    isActive: true,
+    minItems: 3,
+    maxItems: 8,
+    bundleDiscountPercentage: 10,
+    components: ['Box / Basket', 'Main Gift Item', 'Greeting Card', 'Add-on Sweets'],
+    eligibleProductIds: []
+  });
+  const [products, setProducts] = useState<Product[]>([]);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Component add state
+  const [newComponentName, setNewComponentName] = useState('');
+  const [isAddingComponent, setIsAddingComponent] = useState(false);
+
+  // Eligible products modal
+  const [isPoolModalOpen, setIsPoolModalOpen] = useState(false);
+  const [poolSearch, setPoolSearch] = useState('');
+
+  useEffect(() => {
+    const loadedConfig = getStoredGiftConfig();
+    const loadedProducts = getStoredProducts();
+    setProducts(loadedProducts);
+
+    // If eligibleProductIds is empty, default to selecting active products
+    if (!loadedConfig.eligibleProductIds || loadedConfig.eligibleProductIds.length === 0) {
+      loadedConfig.eligibleProductIds = loadedProducts.slice(0, 8).map(p => p.id);
+    }
+    setConfig(loadedConfig);
+  }, []);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleSaveSettings = () => {
+    saveStoredGiftConfig(config);
+    showToast('Gift Builder configuration saved successfully.');
+  };
+
+  const handleToggleActive = () => {
+    const updated = { ...config, isActive: !config.isActive };
+    setConfig(updated);
+    saveStoredGiftConfig(updated);
+    showToast(updated.isActive ? 'Gift Builder is now active on storefront.' : 'Gift Builder deactivated.');
+  };
+
+  const handleAddComponent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComponentName.trim()) return;
+    const trimmed = newComponentName.trim();
+    if (config.components.includes(trimmed)) return;
+
+    const updated = {
+      ...config,
+      components: [...config.components, trimmed]
+    };
+    setConfig(updated);
+    saveStoredGiftConfig(updated);
+    setNewComponentName('');
+    setIsAddingComponent(false);
+    showToast(`Added component step "${trimmed}".`);
+  };
+
+  const handleRemoveComponent = (compName: string) => {
+    const updated = {
+      ...config,
+      components: config.components.filter(c => c !== compName)
+    };
+    setConfig(updated);
+    saveStoredGiftConfig(updated);
+    showToast(`Removed "${compName}".`);
+  };
+
+  const toggleProductEligibility = (productId: string) => {
+    const current = config.eligibleProductIds || [];
+    const isSelected = current.includes(productId);
+    const updatedIds = isSelected 
+      ? current.filter(id => id !== productId)
+      : [...current, productId];
+
+    const updated = { ...config, eligibleProductIds: updatedIds };
+    setConfig(updated);
+    saveStoredGiftConfig(updated);
+  };
+
+  const selectAllProducts = () => {
+    const allIds = products.map(p => p.id);
+    const updated = { ...config, eligibleProductIds: allIds };
+    setConfig(updated);
+    saveStoredGiftConfig(updated);
+  };
+
+  const clearAllProducts = () => {
+    const updated = { ...config, eligibleProductIds: [] };
+    setConfig(updated);
+    saveStoredGiftConfig(updated);
+  };
+
+  const filteredPoolProducts = products.filter(p => 
+    p.name.toLowerCase().includes(poolSearch.toLowerCase()) ||
+    p.primaryCategoryId.toLowerCase().includes(poolSearch.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
+      {/* Toast */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-navy text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 border border-navy-light text-sm font-medium animate-in fade-in slide-in-from-bottom-3">
+          <Check className="w-4 h-4 text-emerald-400" />
+          {toastMessage}
+        </div>
+      )}
+
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-display font-bold text-navy">Gift Builder Config</h2>
-          <p className="text-sm text-text-muted">Manage the custom gift box creation experience.</p>
+          <p className="text-sm text-text-muted">Configure the custom Kenyan gift curation builder for diaspora senders.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant={config.isActive ? "outline" : "default"} onClick={() => setConfig({...config, isActive: !config.isActive})}>
-            {config.isActive ? 'Disable Gift Builder' : 'Enable Gift Builder'}
+          <Button 
+            variant={config.isActive ? "outline" : "default"} 
+            onClick={handleToggleActive}
+            className="border-neutral-300"
+          >
+            {config.isActive ? 'Deactivate Builder' : 'Activate Builder'}
           </Button>
-          <Button>Save Settings</Button>
+          <Button onClick={handleSaveSettings} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
+            Save Settings
+          </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6">
-          <h3 className="font-bold text-navy mb-4 flex items-center gap-2"><Settings className="w-5 h-5" /> Rules & Discounting</h3>
+        {/* Rules & Discounting */}
+        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 space-y-4">
+          <h3 className="font-bold text-navy flex items-center gap-2">
+            <Settings className="w-5 h-5 text-dpc-blue" /> Step Rules & Discounting
+          </h3>
           
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-navy mb-1">Minimum Items</label>
-              <input type="number" className="w-full p-2 border border-neutral-300 rounded" value={config.minItems} onChange={e => setConfig({...config, minItems: parseInt(e.target.value)})} />
+              <label className="block text-xs font-bold text-navy mb-1">Minimum Items Required in Custom Box</label>
+              <input 
+                type="number" 
+                min="1"
+                className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm" 
+                value={config.minItems} 
+                onChange={e => setConfig({...config, minItems: parseInt(e.target.value) || 1})} 
+              />
+              <p className="text-xs text-text-muted mt-1">Sender must choose at least this many items to checkout.</p>
             </div>
+
             <div>
-              <label className="block text-sm font-semibold text-navy mb-1">Maximum Items</label>
-              <input type="number" className="w-full p-2 border border-neutral-300 rounded" value={config.maxItems} onChange={e => setConfig({...config, maxItems: parseInt(e.target.value)})} />
+              <label className="block text-xs font-bold text-navy mb-1">Maximum Items Capacity</label>
+              <input 
+                type="number" 
+                min="1"
+                className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm" 
+                value={config.maxItems} 
+                onChange={e => setConfig({...config, maxItems: parseInt(e.target.value) || 10})} 
+              />
+              <p className="text-xs text-text-muted mt-1">Maximum number of items that fit into the standard curated gift hamper.</p>
             </div>
+
             <div>
-              <label className="block text-sm font-semibold text-navy mb-1">Bundle Discount (%)</label>
-              <input type="number" className="w-full p-2 border border-neutral-300 rounded" value={config.bundleDiscountPercentage} onChange={e => setConfig({...config, bundleDiscountPercentage: parseInt(e.target.value)})} />
-              <p className="text-xs text-text-muted mt-1">Discount applied when customers build a custom box.</p>
+              <label className="block text-xs font-bold text-navy mb-1">Bundle Incentive Discount (%)</label>
+              <div className="relative">
+                <input 
+                  type="number" 
+                  min="0"
+                  max="100"
+                  className="w-full p-2.5 pr-8 border border-neutral-300 rounded-lg text-sm" 
+                  value={config.bundleDiscountPercentage} 
+                  onChange={e => setConfig({...config, bundleDiscountPercentage: parseInt(e.target.value) || 0})} 
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">%</span>
+              </div>
+              <p className="text-xs text-text-muted mt-1">Automatic bundle savings applied when customers complete a gift box.</p>
+            </div>
+
+            <div className="pt-3 border-t border-neutral-100 flex items-center justify-between">
+              <span className="text-xs font-bold text-navy">Builder Status</span>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${config.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-100 text-neutral-600'}`}>
+                {config.isActive ? 'Enabled & Live' : 'Disabled'}
+              </span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6">
-          <h3 className="font-bold text-navy mb-4 flex items-center gap-2"><Package className="w-5 h-5" /> Allowed Components</h3>
-          
-          <div className="flex flex-wrap gap-2 mb-4">
-            {config.components.map((comp: string, idx: number) => (
-              <div key={idx} className="flex items-center gap-1 bg-neutral-100 text-navy px-3 py-1.5 rounded-full text-sm font-medium">
-                {comp}
-                <button className="text-text-muted hover:text-red-500"><X className="w-3 h-3" /></button>
-              </div>
-            ))}
-            <Button variant="outline" size="sm" className="rounded-full px-3 py-1.5 h-auto text-sm"><Plus className="w-3 h-3 mr-1" /> Add Component</Button>
+        {/* Builder Component Steps & Product Pool */}
+        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 space-y-6">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-navy flex items-center gap-2">
+                <Layers className="w-5 h-5 text-dpc-blue" /> Gift Step Components
+              </h3>
+              <span className="text-xs text-text-muted">{config.components.length} curation steps</span>
+            </div>
+            
+            <div className="flex flex-wrap gap-2 mb-3">
+              {config.components.map((comp: string, idx: number) => (
+                <div key={idx} className="flex items-center gap-1.5 bg-neutral-100 text-navy px-3 py-1.5 rounded-full text-xs font-semibold border border-neutral-200">
+                  <span>{comp}</span>
+                  {config.components.length > 1 && (
+                    <button 
+                      onClick={() => handleRemoveComponent(comp)}
+                      className="text-text-muted hover:text-red-500 rounded-full p-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {isAddingComponent ? (
+              <form onSubmit={handleAddComponent} className="flex gap-2 items-center mt-2">
+                <input 
+                  type="text" 
+                  autoFocus
+                  placeholder="Step title (e.g. Scented Candle)" 
+                  value={newComponentName}
+                  onChange={(e) => setNewComponentName(e.target.value)}
+                  className="text-xs p-2 border border-neutral-300 rounded-lg flex-1"
+                />
+                <Button type="submit" size="sm" className="bg-dpc-blue text-white text-xs h-8">Add</Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setIsAddingComponent(false)} className="text-xs h-8">Cancel</Button>
+              </form>
+            ) : (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsAddingComponent(true)}
+                className="rounded-full px-3 py-1.5 h-auto text-xs border-dashed"
+              >
+                <Plus className="w-3 h-3 mr-1" /> Add Component Step
+              </Button>
+            )}
           </div>
 
-          <h4 className="font-semibold text-navy text-sm mt-6 mb-2">Eligible Products Pool</h4>
-          <div className="text-sm text-text-muted bg-neutral-50 p-4 border border-neutral-200 rounded-lg">
-            {config.eligibleProductIds.length} products currently eligible to be included in custom boxes.
-            <Button variant="link" className="px-0 ml-2">Manage Pool</Button>
+          <div className="pt-4 border-t border-neutral-100">
+            <h4 className="font-bold text-navy text-sm mb-2 flex items-center gap-2">
+              <Package className="w-4 h-4 text-dpc-blue" /> Eligible Products Pool
+            </h4>
+            <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-bold text-navy">
+                    {config.eligibleProductIds?.length || 0} Products Included
+                  </div>
+                  <div className="text-xs text-text-muted">
+                    Out of {products.length} total catalog items
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsPoolModalOpen(true)}
+                  className="bg-white text-xs font-bold border-neutral-300"
+                >
+                  Manage Product Pool
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
 
       </div>
+
+      {/* Eligible Products Pool Modal */}
+      {isPoolModalOpen && (
+        <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6 border border-neutral-200 animate-in fade-in zoom-in-95 max-h-[85vh] flex flex-col">
+            <div className="flex justify-between items-center pb-3 border-b border-neutral-100 mb-3">
+              <div>
+                <h3 className="text-lg font-bold text-navy flex items-center gap-2">
+                  <Package className="w-5 h-5 text-dpc-blue" /> Select Eligible Gift Box Products
+                </h3>
+                <p className="text-xs text-text-muted">Choose which products customers can add when crafting a custom diaspora box.</p>
+              </div>
+              <button onClick={() => setIsPoolModalOpen(false)} className="text-text-muted hover:text-navy">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <input 
+                type="text" 
+                placeholder="Search products by title or category..." 
+                value={poolSearch}
+                onChange={(e) => setPoolSearch(e.target.value)}
+                className="text-xs p-2 border border-neutral-300 rounded-lg flex-1"
+              />
+              <div className="flex gap-2">
+                <button onClick={selectAllProducts} className="text-xs text-dpc-blue hover:underline font-medium">Select All</button>
+                <span className="text-neutral-300">|</span>
+                <button onClick={clearAllProducts} className="text-xs text-red-600 hover:underline font-medium">Clear All</button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              {filteredPoolProducts.map(prod => {
+                const isSelected = config.eligibleProductIds?.includes(prod.id);
+                return (
+                  <div 
+                    key={prod.id} 
+                    onClick={() => toggleProductEligibility(prod.id)}
+                    className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
+                      isSelected ? 'border-dpc-blue bg-blue-50/50' : 'border-neutral-200 hover:bg-neutral-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-neutral-100 border border-neutral-200 shrink-0">
+                        {prod.images[0] && <img src={prod.images[0]} alt="" className="w-full h-full object-cover" />}
+                      </div>
+                      <div>
+                        <div className="font-bold text-navy text-xs sm:text-sm">{prod.name}</div>
+                        <div className="text-[11px] text-text-muted capitalize">
+                          {prod.primaryCategoryId} • ${(prod.salePrice || prod.price).toFixed(2)} • {prod.inventory} in stock
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      {isSelected ? (
+                        <div className="w-5 h-5 rounded bg-dpc-blue text-white flex items-center justify-center">
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        </div>
+                      ) : (
+                        <div className="w-5 h-5 rounded border border-neutral-300 bg-white" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-3 border-t border-neutral-100 flex justify-between items-center">
+              <span className="text-xs text-text-muted">
+                <strong>{config.eligibleProductIds?.length || 0}</strong> products selected
+              </span>
+              <Button onClick={() => setIsPoolModalOpen(false)} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold text-xs">
+                Done & Apply
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+

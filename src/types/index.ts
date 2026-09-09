@@ -144,6 +144,7 @@ export interface DeliveryZone {
   sameDayAvailable: boolean;
   scheduledAvailable: boolean;
   minimumOrder: number;
+  postalCodes?: string[];
 }
 
 export interface Driver {
@@ -201,6 +202,10 @@ export interface Coupon {
   startDate?: string;
   endDate?: string;
   isActive: boolean;
+  type?: 'PERCENTAGE' | 'FIXED';
+  value?: number;
+  validUntil?: string;
+  minOrderAmount?: number;
 }
 
 export interface Campaign {
@@ -216,13 +221,14 @@ export interface Campaign {
 
 export interface CmsSection {
   id: string;
-  type: "HERO" | "QUICK_SHOP" | "RECIPIENTS" | "OCCASIONS" | "BUDGET" | "BESTSELLERS" | "GIFT_BUILDER" | "FAMILY_SUPPORT" | "MADE_IN_KENYA" | "FLOWERS_AND_CAKES" | "TESTIMONIALS" | "TRUST" | "BANNER";
+  type: "HERO" | "QUICK_SHOP" | "RECIPIENTS" | "OCCASIONS" | "BUDGET" | "BESTSELLERS" | "GIFT_BUILDER" | "FAMILY_SUPPORT" | "MADE_IN_KENYA" | "FLOWERS_AND_CAKES" | "TESTIMONIALS" | "TRUST" | "BANNER" | string;
   title?: string;
   isVisible: boolean;
   order: number;
   scheduledStart?: string;
   scheduledEnd?: string;
   data?: any;
+  items?: any[];
 }
 
 export interface GiftBuilderConfig {
@@ -251,6 +257,8 @@ export interface Order {
   customerId?: string; // Optional for guest checkout in mock
   customerEmail?: string;
   customerName?: string;
+  customerPhone?: string;
+  paymentStatus?: "PAID" | "PENDING" | "FAILED" | "REFUNDED";
   
   recipientName?: string;
   recipientPhone?: string;
@@ -277,4 +285,91 @@ export interface Order {
   
   createdAt: string;
   updatedAt: string;
+}
+
+export interface HouseRental {
+  id: string;
+  title: string;
+  slug: string;
+  location: string;
+  city: 'Nairobi' | 'Mombasa' | 'Diani Beach' | 'Naivasha' | 'Nakuru' | 'Kisumu' | 'Eldoret';
+  neighborhood: string;
+  pricePerNight: number;
+  pricePerMonth?: number;
+  currency: string;
+  propertyType: 'Serviced Apartment' | 'Holiday Villa' | 'Family Townhouse' | 'Cottage' | 'Penthouse';
+  bedrooms: number;
+  bathrooms: number;
+  maxGuests: number;
+  images: string[];
+  description: string;
+  features: string[];
+  amenities: {
+    hasWifi: boolean;
+    hasGenerator: boolean;
+    hasSecurity: boolean;
+    hasPool: boolean;
+    hasKitchen: boolean;
+    hasParking: boolean;
+    hasAirCon?: boolean;
+    hasBalconyView?: boolean;
+    hasChefService?: boolean;
+    hasAirportPickup?: boolean;
+  };
+  isVerified: boolean;
+  isFeatured?: boolean;
+  hostName: string;
+  hostPhone?: string;
+  hostType: 'Superhost' | 'Verified Property Owner' | 'DPC Partner';
+  rating: number;
+  reviewCount: number;
+  availableFor: 'Both' | 'Short-Stay' | 'Long-Term';
+}
+
+export interface RentalInquiry {
+  id: string;
+  rentalId: string;
+  rentalTitle: string;
+  guestName: string;
+  guestEmail: string;
+  guestPhone: string;
+  senderLocation: string; // e.g. USA, UK
+  purpose: 'Personal Stay / Vacation' | 'For Family in Kenya' | 'Business Travel' | 'Long-term Relocation';
+  checkInDate: string;
+  checkOutDate: string;
+  guestsCount: number;
+  needAirportPickup: boolean;
+  specialRequests?: string;
+  createdAt: string;
+  status: 'SUBMITTED' | 'CONFIRMED' | 'IN_REVIEW';
+}
+
+export interface Advertiser {
+  id: string;
+  businessName: string;
+  tagline: string;
+  category: 'Banking & Mortgages' | 'Real Estate & Land' | 'Building & Construction' | 'Flights & Travel' | 'Legal & Relocation' | 'Healthcare';
+  description: string;
+  logo: string;
+  bannerImage: string;
+  websiteUrl: string;
+  promoBadge?: string;
+  promoCode?: string;
+  contactEmail?: string;
+  phone?: string;
+  location: string;
+  featured: boolean;
+  keyHighlights: string[];
+}
+
+export interface AdPlacementInquiry {
+  id: string;
+  companyName: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  packageType: 'HOMEPAGE_BANNER' | 'CATEGORY_SPONSOR' | 'NEWSLETTER_BLAST' | 'FULL_DIASPORA_SHOWCASE';
+  targetAudience: string;
+  notes?: string;
+  submittedAt: string;
 }

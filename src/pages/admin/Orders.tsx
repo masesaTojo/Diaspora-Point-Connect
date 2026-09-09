@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Order, OrderStatus, Driver } from '@/src/types';
-import { Search, Filter, MoreVertical, Eye, Truck, Check, X, MapPin, Package } from 'lucide-react';
+import { Search, Filter, MoreVertical, Eye, Truck, Check, X, MapPin, Package, Download, MessageSquare } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 import { mockDrivers } from '@/src/lib/mockData';
+import { getStoredOrders, saveStoredOrders } from '@/src/lib/adminStorage';
 
 const STATUS_COLORS: Record<string, string> = {
   NEW: 'bg-blue-100 text-blue-800',
@@ -22,39 +24,77 @@ const ALL_STATUSES: OrderStatus[] = [
 ];
 
 export default function Orders() {
-  const [orders, setOrders] = useState<Partial<Order>[]>([]);
+  const [searchParams] = useSearchParams();
+  const [orders, setOrders] = useState<Order[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [selectedOrder, setSelectedOrder] = useState<Partial<Order> | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  // Load orders from localStorage
+  // Load orders from durable storage
   useEffect(() => {
-    const savedOrders = localStorage.getItem('dpc_orders');
-    if (savedOrders) {
-      setOrders(JSON.parse(savedOrders));
-    }
-  }, []);
+    const loadedOrders = getStoredOrders();
+    setOrders(loadedOrders);
 
-  const saveOrders = (newOrders: Partial<Order>[]) => {
+    // If order param is provided in URL, pre-select it
+    const orderIdParam = searchParams.get('order');
+    if (orderIdParam) {
+      const matched = loadedOrders.find(o => o.id === orderIdParam);
+      if (matched) {
+        setSelectedOrder(matched);
+      }
+    } else if (loadedOrders.length > 0 && !selectedOrder) {
+      setSelectedOrder(loadedOrders[0]);
+    }
+  }, [searchParams]);
+
+  const updateOrdersState = (newOrders: Order[]) => {
     setOrders(newOrders);
-    localStorage.setItem('dpc_orders', JSON.stringify(newOrders));
+    saveStoredOrders(newOrders);
   };
 
   const handleStatusChange = (orderId: string, newStatus: OrderStatus, extraData: Partial<Order> = {}) => {
     const updatedOrders = orders.map(o => 
       o.id === orderId ? { ...o, status: newStatus, updatedAt: new Date().toISOString(), ...extraData } : o
     );
-    saveOrders(updatedOrders);
+    updateOrdersState(updatedOrders);
     if (selectedOrder?.id === orderId) {
       setSelectedOrder(updatedOrders.find(o => o.id === orderId) || null);
     }
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['Order ID', 'Date', 'Customer Name', 'Customer Email', 'Customer Phone', 'Recipient Name', 'Recipient Phone', 'City', 'Address', 'Status', 'Total ($)'];
+    const rows = filteredOrders.map(o => [
+      o.id,
+      o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '',
+      `"${o.customerName || ''}"`,
+      o.customerEmail || '',
+      o.customerPhone || '',
+      `"${o.recipientName || ''}"`,
+      o.recipientPhone || '',
+      o.deliveryCity || '',
+      `"${o.deliveryAddress || ''}"`,
+      o.status || '',
+      o.total?.toFixed(2) || '0.00'
+    ]);
+    
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `dpc_orders_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.recipientName?.toLowerCase().includes(searchTerm.toLowerCase());
+      order.customerEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.recipientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.deliveryCity?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'ALL' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -66,30 +106,35 @@ export default function Orders() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-display font-bold text-navy">Sales & Orders</h2>
-          <p className="text-sm text-text-muted">Manage all customer orders and fulfillments.</p>
+          <p className="text-sm text-text-muted">Manage all cross-border customer orders and track fulfillment in Kenya.</p>
         </div>
         
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-56">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
             <input 
               type="text"
-              placeholder="Search orders..."
+              placeholder="Search ID, customer, city..."
               className="w-full pl-9 pr-4 py-2 border border-neutral-300 rounded-md focus:ring-dpc-blue focus:border-dpc-blue text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <select
-            className="px-4 py-2 border border-neutral-300 rounded-md text-sm bg-white focus:ring-dpc-blue focus:border-dpc-blue"
+            className="px-3 py-2 border border-neutral-300 rounded-md text-sm bg-white focus:ring-dpc-blue focus:border-dpc-blue"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="ALL">All Statuses</option>
+            <option value="ALL">All Statuses ({orders.length})</option>
             {ALL_STATUSES.map(status => (
-              <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>
+              <option key={status} value={status}>
+                {status.replace(/_/g, ' ')} ({orders.filter(o => o.status === status).length})
+              </option>
             ))}
           </select>
+          <Button variant="outline" size="sm" onClick={handleExportCSV} className="border-neutral-300 hover:bg-neutral-50">
+            <Download className="w-4 h-4 mr-1.5" /> CSV
+          </Button>
         </div>
       </div>
 
@@ -102,8 +147,8 @@ export default function Orders() {
               <thead className="bg-neutral-50 text-navy font-semibold border-b border-neutral-200">
                 <tr>
                   <th className="px-6 py-3 whitespace-nowrap">Order ID</th>
-                  <th className="px-6 py-3 whitespace-nowrap">Customer</th>
-                  <th className="px-6 py-3 whitespace-nowrap">Date</th>
+                  <th className="px-6 py-3 whitespace-nowrap">Sender</th>
+                  <th className="px-6 py-3 whitespace-nowrap">Recipient</th>
                   <th className="px-6 py-3 whitespace-nowrap">Status</th>
                   <th className="px-6 py-3 whitespace-nowrap text-right">Total</th>
                   <th className="px-6 py-3"></th>
@@ -120,16 +165,17 @@ export default function Orders() {
                   filteredOrders.map(order => (
                     <tr 
                       key={order.id} 
-                      className={`hover:bg-neutral-50 cursor-pointer transition-colors ${selectedOrder?.id === order.id ? 'bg-blue-50/50' : ''}`}
+                      className={`hover:bg-blue-50/40 cursor-pointer transition-colors ${selectedOrder?.id === order.id ? 'bg-blue-50/80 border-l-4 border-dpc-blue' : ''}`}
                       onClick={() => setSelectedOrder(order)}
                     >
-                      <td className="px-6 py-4 font-medium text-navy">#{order.id}</td>
+                      <td className="px-6 py-4 font-mono font-medium text-navy">#{order.id}</td>
                       <td className="px-6 py-4">
                         <div className="font-medium text-navy">{order.customerName}</div>
                         <div className="text-xs text-text-muted">{order.customerEmail}</div>
                       </td>
-                      <td className="px-6 py-4 text-text-muted whitespace-nowrap">
-                        {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '-'}
+                      <td className="px-6 py-4">
+                        <div className="font-medium text-navy">{order.recipientName}</div>
+                        <div className="text-xs text-text-muted">{order.deliveryCity}</div>
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap ${STATUS_COLORS[order.status || 'NEW'] || 'bg-gray-100 text-gray-800'}`}>
@@ -181,18 +227,25 @@ export default function Orders() {
                     </Button>
                   )}
                   {selectedOrder.status === 'READY_FOR_DELIVERY' && (
-                    <div className="flex gap-2 items-center w-full">
-                      <select 
-                        className="text-sm p-2 border border-neutral-300 rounded flex-1"
-                        id="driver-select"
-                        defaultValue={selectedOrder.driverId || ""}
-                        onChange={(e) => handleStatusChange(selectedOrder.id!, 'DISPATCHED', { driverId: e.target.value })}
-                      >
-                        <option value="">Assign Driver...</option>
-                        {mockDrivers.map(d => (
-                          <option key={d.id} value={d.id}>{d.name} ({d.status})</option>
-                        ))}
-                      </select>
+                    <div className="flex flex-col gap-2 w-full">
+                      <label className="text-xs font-bold text-navy">Assign Driver for Dispatch:</label>
+                      <div className="flex gap-2 items-center w-full">
+                        <select 
+                          className="text-sm p-2 border border-neutral-300 rounded flex-1 bg-white"
+                          id="driver-select"
+                          defaultValue={selectedOrder.driverId || ""}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleStatusChange(selectedOrder.id!, 'DISPATCHED', { driverId: e.target.value });
+                            }
+                          }}
+                        >
+                          <option value="">Select a Driver...</option>
+                          {mockDrivers.map(d => (
+                            <option key={d.id} value={d.id}>{d.name} ({d.status})</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   )}
                   {selectedOrder.status === 'DISPATCHED' && (
@@ -201,7 +254,7 @@ export default function Orders() {
                     </Button>
                   )}
                   {selectedOrder.status === 'OUT_FOR_DELIVERY' && (
-                    <Button size="sm" onClick={() => handleStatusChange(selectedOrder.id!, 'DELIVERED', { proofOfDelivery: 'https://example.com/signature.png' })} className="bg-green-600 hover:bg-green-700">
+                    <Button size="sm" onClick={() => handleStatusChange(selectedOrder.id!, 'DELIVERED', { proofOfDelivery: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=400' })} className="bg-green-600 hover:bg-green-700">
                       <Check className="h-4 w-4 mr-1" /> Mark Delivered (Capture Proof)
                     </Button>
                   )}
@@ -238,7 +291,7 @@ export default function Orders() {
                     </p>
                     {selectedOrder.proofOfDelivery && (
                       <div className="mt-2 text-sm">
-                        <span className="text-text-muted flex items-center gap-2"><Check className="w-4 h-4 text-green-600" /> Proof of Delivery Captured</span>
+                        <span className="text-text-muted flex items-center gap-2"><Check className="w-4 h-4 text-green-600" /> Proof of Delivery Verified</span>
                       </div>
                     )}
                   </div>
@@ -246,24 +299,39 @@ export default function Orders() {
                 <div>
                   <h4 className="font-semibold text-navy mb-2 text-sm uppercase tracking-wider">Customer</h4>
                   <p className="text-sm font-medium">{selectedOrder.customerName}</p>
-                  <p className="text-sm text-text-muted">{selectedOrder.customerEmail}</p>
+                  <p className="text-sm text-text-muted">{selectedOrder.customerEmail} • {selectedOrder.customerPhone || 'Diaspora'}</p>
                 </div>
 
                 <div>
                   <h4 className="font-semibold text-navy mb-2 text-sm uppercase tracking-wider">Recipient & Delivery</h4>
                   <p className="text-sm font-medium">{selectedOrder.recipientName} ({selectedOrder.recipientPhone})</p>
                   <p className="text-sm text-text-muted mt-1">{selectedOrder.deliveryAddress}, {selectedOrder.deliveryCity}</p>
+                  {selectedOrder.deliveryNotes && (
+                    <p className="text-xs bg-amber-50 text-amber-800 p-2 rounded-md border border-amber-200 mt-2">
+                      <strong>Delivery Instructions:</strong> {selectedOrder.deliveryNotes}
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <h4 className="font-semibold text-navy mb-2 text-sm uppercase tracking-wider border-b border-neutral-100 pb-2">Order Items</h4>
                   <div className="space-y-3 mt-3">
                     {selectedOrder.items?.map((item, idx) => (
-                      <div key={idx} className="flex justify-between text-sm">
-                        <div className="flex-1 pr-4">
-                          <span className="font-medium text-navy">{item.quantity}x {item.productName}</span>
+                      <div key={idx} className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100 text-sm">
+                        <div className="flex justify-between">
+                          <div className="flex-1 pr-4">
+                            <span className="font-medium text-navy">{item.quantity}x {item.productName}</span>
+                          </div>
+                          <span className="font-bold text-navy whitespace-nowrap">${item.totalPrice?.toFixed(2)}</span>
                         </div>
-                        <span className="font-medium text-navy whitespace-nowrap">${item.totalPrice?.toFixed(2)}</span>
+                        {item.giftMessage && (
+                          <div className="mt-2 text-xs text-text-muted bg-white p-2 rounded border border-neutral-200 flex items-start gap-1.5">
+                            <MessageSquare className="w-3.5 h-3.5 text-dpc-blue shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-semibold text-navy">Gift Card Message:</span> "{item.giftMessage}"
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -278,7 +346,19 @@ export default function Orders() {
                     <span>Delivery</span>
                     <span>${selectedOrder.deliveryFee?.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between font-bold text-navy text-lg pt-2">
+                  {selectedOrder.serviceFee && (
+                    <div className="flex justify-between text-text-muted">
+                      <span>Service Fee</span>
+                      <span>${selectedOrder.serviceFee?.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {selectedOrder.discount && selectedOrder.discount > 0 ? (
+                    <div className="flex justify-between text-emerald-600">
+                      <span>Discount</span>
+                      <span>-${selectedOrder.discount?.toFixed(2)}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between font-bold text-navy text-lg pt-2 border-t border-neutral-100">
                     <span>Total</span>
                     <span>${selectedOrder.total?.toFixed(2)}</span>
                   </div>

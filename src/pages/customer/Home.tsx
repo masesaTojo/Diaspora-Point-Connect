@@ -1,107 +1,133 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/src/components/ui/Button';
-import { ArrowRight, Package, Heart, Globe, CreditCard } from 'lucide-react';
+import { ArrowRight, Package, Heart, Globe, CreditCard, Home as HomeIcon, ShieldCheck, Zap, Wifi, MapPin } from 'lucide-react';
 import { ProductCard } from '@/src/components/ui/ProductCard';
 import { SectionHeading } from '@/src/components/ui/SectionHeading';
-import { mockProducts, mockRecipients, mockOccasions, mockCollections } from '@/src/lib/mockData';
+import { mockRecipients, mockOccasions, mockCollections } from '@/src/lib/mockData';
+import { mockHouseRentals } from '@/src/lib/rentalsAndAdsData';
+import { AdvertisersSection } from '@/src/components/sections/AdvertisersSection';
+import { useShop } from '@/src/contexts/ShopContext';
 
 export default function Home() {
+  const { products, cmsSections } = useShop();
+
+  const isSectionVisible = (type: string) => {
+    const section = cmsSections.find(s => s.type === type);
+    return section ? section.isVisible : true;
+  };
+
+  const activeProducts = products.filter(p => p.status !== 'ARCHIVED');
+  const bestsellers = activeProducts.filter(p => p.isBestseller || p.collections?.includes('Bestsellers'));
+  const displayBestsellers = bestsellers.length > 0 ? bestsellers.slice(0, 4) : activeProducts.slice(0, 4);
+
+  const familySupportProducts = activeProducts.filter(p => p.primaryCategoryId === 'family-support');
+  const kenyaProducts = activeProducts.filter(p => p.primaryCategoryId === 'kenya' || p.tags?.includes('Kenya'));
+
   return (
     <div className="flex flex-col w-full overflow-x-hidden">
       {/* 1. Hero Section */}
-      <section className="relative bg-navy-dark text-white min-h-[600px] flex items-center">
-        <div className="absolute inset-0 z-0">
-          <img 
-            src="https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=2000&q=80" 
-            alt="Happy Kenyan Family" 
-            className="w-full h-full object-cover opacity-40"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-navy-dark via-navy-dark/80 to-transparent"></div>
-        </div>
-        
-        <div className="relative z-10 max-w-7xl mx-auto px-4 w-full">
-          <div className="max-w-2xl">
-            <h1 className="text-5xl md:text-7xl font-display font-bold mb-6 leading-tight">
-              Send Love <span className="text-dpc-yellow">Home.</span>
-            </h1>
-            <p className="text-xl md:text-2xl text-gray-200 mb-10 leading-relaxed">
-              Thoughtful gifts, essential groceries, and Kenyan products delivered directly to the people you love.
-            </p>
-            <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-              <Link to="/shop/category/gifts">
-                <Button size="lg" variant="secondary" className="text-lg font-bold">
-                  SHOP GIFTS
-                </Button>
-              </Link>
-              <Link to="/shop/category/family-support">
-                <Button size="lg" variant="outline" className="text-white border-white hover:bg-white/10 hover:text-white text-lg">
-                  SUPPORT HOME
+      {isSectionVisible('HERO') && (
+        <section className="relative bg-navy-dark text-white min-h-[600px] flex items-center">
+          <div className="absolute inset-0 z-0">
+            <img 
+              src="https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=2000&q=80" 
+              alt="Happy Kenyan Family" 
+              className="w-full h-full object-cover opacity-40"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-navy-dark via-navy-dark/80 to-transparent"></div>
+          </div>
+          
+          <div className="relative z-10 max-w-7xl mx-auto px-4 w-full">
+            <div className="max-w-2xl">
+              <h1 className="text-5xl md:text-7xl font-display font-bold mb-6 leading-tight">
+                Send Love <span className="text-dpc-yellow">Home.</span>
+              </h1>
+              <p className="text-xl md:text-2xl text-gray-200 mb-10 leading-relaxed">
+                Thoughtful gifts, essential groceries, and Kenyan products delivered directly to the people you love.
+              </p>
+              <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                <Link to="/shop/category/gifts">
+                  <Button size="lg" variant="secondary" className="text-lg font-bold">
+                    SHOP GIFTS
+                  </Button>
+                </Link>
+                <Link to="/shop/category/family-support">
+                  <Button size="lg" variant="outline" className="text-white border-white hover:bg-white/10 hover:text-white text-lg">
+                    SUPPORT HOME
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 2. Quick Shop Categories */}
+      {isSectionVisible('QUICK_SHOP') && (
+        <section className="py-12 bg-white border-b border-neutral-100">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
+              {[
+                { name: "Send a Gift", icon: "🎁", color: "bg-pink-50", link: "/shop/category/gifts" },
+                { name: "Flowers & Cakes", icon: "💐", color: "bg-purple-50", link: "/shop/category/flowers" },
+                { name: "Support Home", icon: "🛒", color: "bg-blue-50", link: "/shop/category/family-support" },
+                { name: "House Rentals", icon: "🏡", color: "bg-emerald-50", link: "/rentals" },
+                { name: "Made in Kenya", icon: "🌍", color: "bg-yellow-50", link: "/shop/category/kenya" },
+              ].map((cat, i) => (
+                <Link to={cat.link} key={i} className={`flex flex-col items-center justify-center p-6 rounded-2xl cursor-pointer hover:-translate-y-1 transition-transform ${cat.color}`}>
+                  <span className="text-4xl mb-3">{cat.icon}</span>
+                  <span className="font-semibold text-navy text-center">{cat.name}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 3. Shop By Recipient */}
+      {isSectionVisible('RECIPIENTS') && (
+        <section className="py-20 bg-neutral-bg">
+          <div className="max-w-7xl mx-auto px-4">
+            <SectionHeading 
+              title="Who are you shopping for?" 
+              subtitle="Find the perfect items tailored for your loved ones."
+              align="center"
+            />
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+              {mockRecipients.map((rec, i) => (
+                <Link to={`/shop?recipient=${encodeURIComponent(rec.name)}`} key={i} className="group cursor-pointer flex flex-col items-center text-center">
+                  <div className="w-32 h-32 rounded-full overflow-hidden mb-4 border-4 border-white shadow-md group-hover:border-dpc-yellow transition-colors">
+                    <img src={rec.image} alt={rec.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  </div>
+                  <h3 className="font-semibold text-navy text-lg group-hover:text-dpc-blue transition-colors">{rec.name}</h3>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 4. Bestsellers */}
+      {isSectionVisible('BESTSELLERS') && (
+        <section className="py-20 bg-white">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex justify-between items-end mb-10">
+              <SectionHeading title="Bestsellers" className="mb-0" />
+              <Link to="/shop/collection/bestsellers">
+                <Button variant="ghost" className="hidden sm:flex group">
+                  View All <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+              {displayBestsellers.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
-
-      {/* 2. Quick Shop Categories */}
-      <section className="py-12 bg-white border-b border-neutral-100">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-            {[
-              { name: "Send a Gift", icon: "🎁", color: "bg-pink-50", link: "/shop/category/gifts" },
-              { name: "Flowers & Cakes", icon: "💐", color: "bg-purple-50", link: "/shop/category/flowers" },
-              { name: "Support Home", icon: "🛒", color: "bg-blue-50", link: "/shop/category/family-support" },
-              { name: "Made in Kenya", icon: "🌍", color: "bg-yellow-50", link: "/shop/category/kenya" },
-            ].map((cat, i) => (
-              <Link to={cat.link} key={i} className={`flex flex-col items-center justify-center p-6 rounded-2xl cursor-pointer hover:-translate-y-1 transition-transform ${cat.color}`}>
-                <span className="text-4xl mb-3">{cat.icon}</span>
-                <span className="font-semibold text-navy text-center">{cat.name}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 3. Shop By Recipient */}
-      <section className="py-20 bg-neutral-bg">
-        <div className="max-w-7xl mx-auto px-4">
-          <SectionHeading 
-            title="Who are you shopping for?" 
-            subtitle="Find the perfect items tailored for your loved ones."
-            align="center"
-          />
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {mockRecipients.map((rec, i) => (
-              <Link to={`/shop?recipient=${encodeURIComponent(rec.name)}`} key={i} className="group cursor-pointer flex flex-col items-center text-center">
-                <div className="w-32 h-32 rounded-full overflow-hidden mb-4 border-4 border-white shadow-md group-hover:border-dpc-yellow transition-colors">
-                  <img src={rec.image} alt={rec.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                </div>
-                <h3 className="font-semibold text-navy text-lg group-hover:text-dpc-blue transition-colors">{rec.name}</h3>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 4. Bestsellers */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex justify-between items-end mb-10">
-            <SectionHeading title="Bestsellers" className="mb-0" />
-            <Link to="/shop/collection/bestsellers">
-              <Button variant="ghost" className="hidden sm:flex group">
-                View All <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-            {mockProducts.slice(0, 4).map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 4.5 Collections */}
       <section className="py-20 bg-neutral-bg">
@@ -133,117 +159,213 @@ export default function Home() {
       </section>
 
       {/* 5. Build a Gift Promo */}
-      <section className="py-20 bg-dpc-blue text-white overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <span className="text-dpc-yellow font-bold tracking-wider uppercase text-sm mb-4 block">Personalized Experience</span>
-              <h2 className="text-4xl md:text-5xl font-display font-bold mb-6 leading-tight">Build the Perfect Custom Hamper</h2>
-              <p className="text-xl text-blue-100 mb-8 max-w-lg">
-                Select a beautiful basket, add their favorite treats, and include a personalized video message. We'll beautifully wrap and deliver it.
-              </p>
-              <Link to="/shop/collection/build-a-gift">
-                <Button variant="secondary" size="lg" className="font-bold text-lg">
-                  Start Building
-                </Button>
-              </Link>
-            </div>
-            <div className="relative">
-              <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl relative z-10">
-                <img src="https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=800&q=80" alt="Gift Hamper" className="object-cover w-full h-full" />
+      {isSectionVisible('GIFT_BUILDER') && (
+        <section className="py-20 bg-dpc-blue text-white overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+              <div>
+                <span className="text-dpc-yellow font-bold tracking-wider uppercase text-sm mb-4 block">Personalized Experience</span>
+                <h2 className="text-4xl md:text-5xl font-display font-bold mb-6 leading-tight">Build the Perfect Custom Hamper</h2>
+                <p className="text-xl text-blue-100 mb-8 max-w-lg">
+                  Select a beautiful basket, add their favorite treats, and include a personalized video message. We'll beautifully wrap and deliver it.
+                </p>
+                <Link to="/gift-builder">
+                  <Button variant="secondary" size="lg" className="font-bold text-lg">
+                    Start Building
+                  </Button>
+                </Link>
               </div>
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-dpc-blue-light/30 rounded-full blur-3xl z-0"></div>
+              <div className="relative">
+                <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl relative z-10">
+                  <img src="https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=800&q=80" alt="Gift Hamper" className="object-cover w-full h-full" />
+                </div>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-dpc-blue-light/30 rounded-full blur-3xl z-0"></div>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 6. Shop by Occasion & Budget */}
-      <section className="py-20 bg-neutral-bg">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-16">
-          
-          {/* Occasions */}
-          <div>
-            <SectionHeading title="Shop by Occasion" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {mockOccasions.map((occ, i) => (
-                <Link to={`/shop?occasion=${encodeURIComponent(occ.name)}`} key={i} className="bg-white p-4 rounded-xl shadow-sm border border-neutral-100 flex items-center space-x-4 cursor-pointer hover:border-dpc-blue hover:shadow-md transition-all">
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-2xl ${occ.color}`}>
-                    {occ.icon}
-                  </div>
-                  <span className="font-semibold text-navy">{occ.name}</span>
-                </Link>
-              ))}
+      {isSectionVisible('OCCASIONS') && (
+        <section className="py-20 bg-neutral-bg">
+          <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-16">
+            
+            {/* Occasions */}
+            <div>
+              <SectionHeading title="Shop by Occasion" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {mockOccasions.map((occ, i) => (
+                  <Link to={`/shop?occasion=${encodeURIComponent(occ.name)}`} key={i} className="bg-white p-4 rounded-xl shadow-sm border border-neutral-100 flex items-center space-x-4 cursor-pointer hover:border-dpc-blue hover:shadow-md transition-all">
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-2xl ${occ.color}`}>
+                      {occ.icon}
+                    </div>
+                    <span className="font-semibold text-navy">{occ.name}</span>
+                  </Link>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Budgets */}
-          <div>
-            <SectionHeading title="Shop by Budget" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {[
-                { label: "Gifts under $25", min: 0, max: 25 },
-                { label: "Gifts $25 - $50", min: 25, max: 50 },
-                { label: "Gifts $50 - $100", min: 50, max: 100 },
-                { label: "Premium Gifts $100+", min: 100, max: 9999 }
-              ].map((budget, i) => (
-                <Link to={`/shop?minPrice=${budget.min}&maxPrice=${budget.max}`} key={i} className="bg-white p-6 rounded-xl shadow-sm border border-neutral-100 flex justify-between items-center cursor-pointer hover:border-dpc-blue hover:shadow-md transition-all group block">
-                  <span className="font-semibold text-navy text-lg">{budget.label}</span>
-                  <div className="w-8 h-8 rounded-full bg-neutral-50 flex items-center justify-center group-hover:bg-dpc-blue group-hover:text-white transition-colors">
-                    <ArrowRight className="w-4 h-4" />
-                  </div>
-                </Link>
-              ))}
+            {/* Budgets */}
+            <div>
+              <SectionHeading title="Shop by Budget" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { label: "Gifts under $25", min: 0, max: 25 },
+                  { label: "Gifts $25 - $50", min: 25, max: 50 },
+                  { label: "Gifts $50 - $100", min: 50, max: 100 },
+                  { label: "Premium Gifts $100+", min: 100, max: 9999 }
+                ].map((budget, i) => (
+                  <Link to={`/shop?minPrice=${budget.min}&maxPrice=${budget.max}`} key={i} className="bg-white p-6 rounded-xl shadow-sm border border-neutral-100 flex justify-between items-center cursor-pointer hover:border-dpc-blue hover:shadow-md transition-all group block">
+                    <span className="font-semibold text-navy text-lg">{budget.label}</span>
+                    <div className="w-8 h-8 rounded-full bg-neutral-50 flex items-center justify-center group-hover:bg-dpc-blue group-hover:text-white transition-colors">
+                      <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
-          </div>
 
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
 
       {/* 7. Specific Categories Highlight */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 space-y-24">
           
           {/* Family Support */}
-          <div>
-            <div className="flex justify-between items-end mb-10">
-              <SectionHeading 
-                title="Family Support & Essentials" 
-                subtitle="High-quality groceries, stationery, and household necessities delivered to their door."
-                className="mb-0" 
-              />
+          {isSectionVisible('FAMILY_SUPPORT') !== false && familySupportProducts.length > 0 && (
+            <div>
+              <div className="flex justify-between items-end mb-10">
+                <SectionHeading 
+                  title="Family Support & Essentials" 
+                  subtitle="High-quality groceries, stationery, and household necessities delivered to their door."
+                  className="mb-0" 
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+                {familySupportProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-              {mockProducts.filter(p => p.primaryCategoryId === 'family-support').map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          </div>
+          )}
 
           {/* Made In Kenya */}
-          <div>
-            <div className="flex justify-between items-end mb-10">
-              <SectionHeading 
-                title="Authentic Made In Kenya" 
-                subtitle="Support local artisans and businesses with our curated selection of Kenyan products."
-                className="mb-0" 
-              />
+          {isSectionVisible('MADE_IN_KENYA') !== false && kenyaProducts.length > 0 && (
+            <div>
+              <div className="flex justify-between items-end mb-10">
+                <SectionHeading 
+                  title="Authentic Made In Kenya" 
+                  subtitle="Support local artisans and businesses with our curated selection of Kenyan products."
+                  className="mb-0" 
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+                {kenyaProducts.slice(0, 4).map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-              {mockProducts.filter(p => p.primaryCategoryId === 'kenya').map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-              {/* Fallbacks if not enough mock data */}
-              {mockProducts.slice(0, 3).map((product) => (
-                 <ProductCard key={`fallback-${product.id}`} product={product} />
-              ))}
-            </div>
-          </div>
+          )}
 
         </div>
       </section>
 
-      {/* 8. How It Works */}
+      {/* 7b. Vetted House Rentals Showcase */}
+      <section className="py-20 bg-neutral-50 border-t border-neutral-200">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100/80 px-3 py-1 rounded-full mb-3">
+                <HomeIcon className="w-3.5 h-3.5 text-emerald-700" />
+                Diaspora Homecoming & Family Accommodations
+              </div>
+              <h2 className="text-3xl md:text-4xl font-display font-bold text-navy">
+                Vetted House Rentals in Kenya
+              </h2>
+              <p className="text-text-muted text-base mt-2 max-w-2xl">
+                Reliable, fully furnished homes with guaranteed generator power backup, fast fiber WiFi, and 24/7 security. Book for your trip home or sponsor comfortable accommodation for family.
+              </p>
+            </div>
+            <Link to="/rentals" className="shrink-0">
+              <Button variant="outline" className="flex items-center gap-2 border-emerald-600/30 text-navy hover:text-emerald-700 hover:bg-emerald-50">
+                View All {mockHouseRentals.length} Rentals <ArrowRight className="w-4 h-4" />
+              </Button>
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {mockHouseRentals.slice(0, 3).map((rental) => (
+              <div key={rental.id} className="bg-white rounded-2xl overflow-hidden border border-neutral-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group">
+                <div>
+                  <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100">
+                    <img src={rental.images[0]} alt={rental.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="absolute top-3 left-3 bg-navy/90 text-white backdrop-blur-md px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-green-400" /> Vetted Stay
+                    </div>
+                    <div className="absolute bottom-3 left-3 right-3 text-white flex items-center justify-between drop-shadow-md">
+                      <span className="text-xs font-medium flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-dpc-yellow shrink-0" />
+                        {rental.location}
+                      </span>
+                      <span className="text-xs bg-white/20 backdrop-blur-md px-2 py-0.5 rounded font-semibold">
+                        {rental.propertyType}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-5">
+                    <h3 className="font-display font-bold text-navy text-lg group-hover:text-dpc-blue transition-colors line-clamp-1 mb-2">
+                      {rental.title}
+                    </h3>
+                    <p className="text-xs text-text-muted line-clamp-2 mb-4">
+                      {rental.description}
+                    </p>
+                    <div className="flex items-center gap-4 text-xs font-medium text-navy pb-3 border-b border-neutral-100">
+                      <span>{rental.bedrooms} Beds</span>
+                      <span>•</span>
+                      <span>{rental.bathrooms} Baths</span>
+                      <span>•</span>
+                      <span>Max {rental.maxGuests} Guests</span>
+                    </div>
+                    <div className="pt-3 space-y-1.5 text-xs text-text-muted">
+                      {rental.amenities.hasGenerator && (
+                        <div className="flex items-center gap-1.5 text-amber-800 bg-amber-50 px-2 py-1 rounded">
+                          <Zap className="w-3.5 h-3.5 text-amber-600" /> Power Backup Generator Included
+                        </div>
+                      )}
+                      {rental.amenities.hasWifi && (
+                        <div className="flex items-center gap-1.5 text-blue-800 bg-blue-50 px-2 py-1 rounded">
+                          <Wifi className="w-3.5 h-3.5 text-dpc-blue" /> High-Speed Fiber Internet
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-5 pt-0 flex items-center justify-between border-t border-neutral-100 mt-2">
+                  <div>
+                    <span className="text-lg font-bold text-navy">${rental.pricePerNight}</span>
+                    <span className="text-xs text-text-muted"> / night</span>
+                  </div>
+                  <Link to="/rentals">
+                    <Button size="sm" className="text-xs bg-navy hover:bg-navy-dark">
+                      Book / Inquire
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 8. Advertisers & Verified Partners Section */}
+      <AdvertisersSection showMediaBanner={true} />
+
+      {/* 9. How It Works */}
       <section className="py-20 bg-navy text-white text-center">
         <div className="max-w-7xl mx-auto px-4">
           <SectionHeading title="How Diaspora Point Connect Works" align="center" className="text-white [&>h2]:text-white [&>p]:text-gray-300" />
@@ -274,39 +396,41 @@ export default function Home() {
       </section>
 
       {/* 9. Trust & Testimonials */}
-      <section className="py-24 bg-neutral-bg">
-        <div className="max-w-7xl mx-auto px-4">
-          <SectionHeading 
-            title="Trusted by the Diaspora" 
-            subtitle="Don't just take our word for it. Here is what our customers have to say."
-            align="center"
-          />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
-            {[
-              { text: "DPC made my mother's birthday so special. The flowers were fresh and the cake was exactly what I ordered. Delivery to Nakuru was flawless.", author: "Jane W.", location: "London, UK" },
-              { text: "I use their monthly family support package to ensure my parents have their groceries sorted. It takes away all the stress of sending money.", author: "David K.", location: "Dallas, TX" },
-              { text: "The quality of the Kenyan-made products is phenomenal. I bought a Maasai blanket and it arrived beautifully packaged.", author: "Sarah M.", location: "Sydney, AU" },
-            ].map((review, i) => (
-              <div key={i} className="bg-white p-8 rounded-2xl shadow-sm border border-neutral-100 relative">
-                <div className="text-dpc-yellow mb-4 flex space-x-1">
-                  <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+      {isSectionVisible('TESTIMONIALS') && (
+        <section className="py-24 bg-neutral-bg">
+          <div className="max-w-7xl mx-auto px-4">
+            <SectionHeading 
+              title="Trusted by the Diaspora" 
+              subtitle="Don't just take our word for it. Here is what our customers have to say."
+              align="center"
+            />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
+              {[
+                { text: "DPC made my mother's birthday so special. The flowers were fresh and the cake was exactly what I ordered. Delivery to Nakuru was flawless.", author: "Jane W.", location: "London, UK" },
+                { text: "I use their monthly family support package to ensure my parents have their groceries sorted. It takes away all the stress of sending money.", author: "David K.", location: "Dallas, TX" },
+                { text: "The quality of the Kenyan-made products is phenomenal. I bought a Maasai blanket and it arrived beautifully packaged.", author: "Sarah M.", location: "Sydney, AU" },
+              ].map((review, i) => (
+                <div key={i} className="bg-white p-8 rounded-2xl shadow-sm border border-neutral-100 relative">
+                  <div className="text-dpc-yellow mb-4 flex space-x-1">
+                    <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+                  </div>
+                  <p className="text-navy text-lg italic mb-6">"{review.text}"</p>
+                  <div>
+                    <p className="font-bold text-navy">{review.author}</p>
+                    <p className="text-text-muted text-sm">{review.location}</p>
+                  </div>
                 </div>
-                <p className="text-navy text-lg italic mb-6">"{review.text}"</p>
-                <div>
-                  <p className="font-bold text-navy">{review.author}</p>
-                  <p className="text-text-muted text-sm">{review.location}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <div className="mt-20 pt-10 border-t border-neutral-200 flex flex-wrap justify-center gap-8 md:gap-16 opacity-60">
-             <div className="flex items-center space-x-2 text-navy font-bold text-xl"><CreditCard /> <span>Secure Payments</span></div>
-             <div className="flex items-center space-x-2 text-navy font-bold text-xl"><Globe /> <span>Worldwide Ordering</span></div>
-             <div className="flex items-center space-x-2 text-navy font-bold text-xl"><Package /> <span>Nationwide Delivery</span></div>
+            <div className="mt-20 pt-10 border-t border-neutral-200 flex flex-wrap justify-center gap-8 md:gap-16 opacity-60">
+               <div className="flex items-center space-x-2 text-navy font-bold text-xl"><CreditCard /> <span>Secure Payments</span></div>
+               <div className="flex items-center space-x-2 text-navy font-bold text-xl"><Globe /> <span>Worldwide Ordering</span></div>
+               <div className="flex items-center space-x-2 text-navy font-bold text-xl"><Package /> <span>Nationwide Delivery</span></div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
     </div>
   );

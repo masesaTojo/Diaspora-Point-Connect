@@ -1,23 +1,27 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Trash2, Plus, Minus, ArrowRight } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Trash2, Plus, Minus, ArrowRight, AlertTriangle } from 'lucide-react';
 import { useShop } from '@/src/contexts/ShopContext';
-import { mockProducts } from '@/src/lib/mockData';
 import { Button } from '@/src/components/ui/Button';
 
 export default function Cart() {
-  const { cart, removeFromCart, updateCartItem } = useShop();
+  const { cart, products, removeFromCart, updateCartItem } = useShop();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isCancelled = searchParams.get('cancelled') === 'true';
 
   const cartItemsWithDetails = cart.map(item => {
-    const product = mockProducts.find(p => p.id === item.productId);
+    const product = products.find(p => p.id === item.productId);
     return {
       ...item,
       product
     };
   }).filter(item => item.product); // Filter out any invalid items
 
-  const hasOutOfStock = cartItemsWithDetails.some(item => item.product?.availability === 'OUT_OF_STOCK');
+  const hasOutOfStock = cartItemsWithDetails.some(item => 
+    item.product?.availability === 'OUT_OF_STOCK' || 
+    (typeof item.product?.inventory === 'number' && item.product.inventory < item.quantity)
+  );
   const subtotal = cartItemsWithDetails.reduce((sum, item) => {
     const price = item.product?.salePrice || item.product?.price || 0;
     const itemTotal = price * item.quantity;
@@ -36,12 +40,7 @@ export default function Cart() {
         <h2 className="text-3xl font-display font-bold text-navy mb-4">Your Cart is Empty</h2>
         <p className="text-text-muted mb-8 max-w-md">Looks like you haven't added any gifts yet. Discover our premium selection of hampers, flowers, and more.</p>
         <Link to="/shop">
-              {hasOutOfStock && (
-                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 border border-red-100">
-                  One or more items in your cart are out of stock. Please remove them to proceed.
-                </div>
-              )}
-          <Button disabled={hasOutOfStock} size="lg">Start Shopping</Button>
+          <Button size="lg">Start Shopping</Button>
         </Link>
       </div>
     );
@@ -52,6 +51,16 @@ export default function Cart() {
       <div className="max-w-7xl mx-auto px-4">
         <h1 className="text-3xl md:text-4xl font-display font-bold text-navy mb-8">Your Gift Order</h1>
         
+        {isCancelled && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl mb-6 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Payment was cancelled</p>
+              <p className="text-sm text-amber-700">Your gift items have been preserved in your cart. You can review your details and try again whenever you are ready.</p>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col lg:flex-row gap-12">
           {/* Cart Items */}
           <div className="lg:w-2/3 space-y-6">

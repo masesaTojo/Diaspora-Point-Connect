@@ -3,9 +3,11 @@ import { useSearchParams, useParams, Link } from 'react-router-dom';
 import { SlidersHorizontal, ChevronDown, X } from 'lucide-react';
 import { ProductCard } from '@/src/components/ui/ProductCard';
 import { Button } from '@/src/components/ui/Button';
-import { mockProducts, mockCategories, mockRecipients, mockOccasions } from '@/src/lib/mockData';
+import { mockRecipients, mockOccasions } from '@/src/lib/mockData';
+import { useShop } from '@/src/contexts/ShopContext';
 
 export default function Shop() {
+  const { products, categories } = useShop();
   const [searchParams, setSearchParams] = useSearchParams();
   const { categorySlug, collectionSlug } = useParams();
   
@@ -19,9 +21,12 @@ export default function Shop() {
   const minPrice = Number(searchParams.get('minPrice')) || 0;
   const maxPrice = Number(searchParams.get('maxPrice')) || 10000;
 
-  // Filter and sort products
+  // Filter and sort products from live store state
   const filteredProducts = useMemo(() => {
-    return mockProducts.filter((p) => {
+    return products.filter((p) => {
+      // Exclude archived
+      if (p.status === 'ARCHIVED') return false;
+
       // 1. Search Query
       if (query && !p.name?.toLowerCase().includes(query.toLowerCase()) && !p.description?.toLowerCase().includes(query.toLowerCase())) {
         return false;
@@ -29,7 +34,7 @@ export default function Shop() {
       
       // 2. Category
       if (categorySlug) {
-        const category = mockCategories.find(c => c.slug === categorySlug);
+        const category = categories.find(c => c.slug === categorySlug);
         if (category && p.primaryCategoryId !== category.slug) {
           return false;
         }
@@ -73,7 +78,7 @@ export default function Shop() {
           return (b.isFeatured === a.isFeatured) ? 0 : b.isFeatured ? 1 : -1;
       }
     });
-  }, [query, categorySlug, minPrice, maxPrice, recipientFilter, occasionFilter, sortBy]);
+  }, [products, categories, query, categorySlug, collectionSlug, minPrice, maxPrice, recipientFilter, occasionFilter, sortBy]);
 
   const updateParam = (key: string, value: string) => {
     const newParams = new URLSearchParams(searchParams);
@@ -86,7 +91,7 @@ export default function Shop() {
   };
 
   const categoryName = categorySlug 
-    ? mockCategories.find(c => c.slug === categorySlug)?.name || 'All Products'
+    ? categories.find(c => c.slug === categorySlug)?.name || 'All Products'
     : 'All Products';
 
   const resultsTitle = query ? `Search results for "${query}"` : categoryName;
@@ -157,7 +162,7 @@ export default function Shop() {
                       All Products
                     </Link>
                   </li>
-                  {mockCategories.map(cat => (
+                  {categories.map(cat => (
                     <li key={cat.id}>
                       <Link 
                         to={`/shop/category/${cat.slug}`} 
@@ -168,6 +173,25 @@ export default function Shop() {
                     </li>
                   ))}
                 </ul>
+
+                {/* Stays & Partner Services Sub-nav */}
+                <div className="mt-6 pt-4 border-t border-neutral-border">
+                  <h4 className="font-semibold text-xs text-navy uppercase tracking-wider mb-2">Accommodations & Services</h4>
+                  <ul className="space-y-2 text-sm">
+                    <li>
+                      <Link to="/rentals" className="flex items-center gap-1.5 text-text hover:text-emerald-600 transition-colors">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <span>House Rentals in Kenya</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link to="/advertise" className="flex items-center gap-1.5 text-text hover:text-dpc-blue transition-colors">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                        <span>Verified Advertisers</span>
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
               </div>
 
               {/* Price Filter */}
