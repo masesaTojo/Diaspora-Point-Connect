@@ -11,7 +11,7 @@ interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
-  const { wishlist, toggleWishlist, addToCart } = useShop();
+  const { wishlist, toggleWishlist, addToCart, convertPrice } = useShop();
   
   // Safe default for ID
   const productId = product.id || '';
@@ -76,8 +76,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </div>
         )}
 
-        <div className="mt-auto flex items-center justify-between">          <div className="text-xl font-bold text-navy">            {product.salePrice ? (              <div className="flex items-center gap-2">                <span className="text-red-600">${product.salePrice.toFixed(2)}</span>                <span className="text-sm text-text-muted line-through">${product.price?.toFixed(2)}</span>              </div>            ) : (              <span>${product.price?.toFixed(2)}</span>            )}          </div>          <button 
-            onClick={handleAddToCart}
+        <div className="mt-auto flex items-center justify-between">
+          <div className="text-xl font-bold text-navy">
+            {product.salePrice ? (
+              <div className="flex items-center gap-2">
+                <span className="text-red-600">{convertPrice(product.salePrice)}</span>
+                <span className="text-sm text-text-muted line-through">{convertPrice(product.price || 0)}</span>
+              </div>
+            ) : (
+              <span>{convertPrice(product.price || 0)}</span>
+            )}
+          </div>
+          <button             onClick={handleAddToCart}
             disabled={product.availability === 'OUT_OF_STOCK'} className={`h-10 w-10 rounded-full flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-dpc-blue focus:ring-offset-2 ${product.availability === 'OUT_OF_STOCK' ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed' : 'bg-neutral-100 text-navy hover:bg-dpc-blue hover:text-white'}`}
           >
             <ShoppingBag className="w-5 h-5" />

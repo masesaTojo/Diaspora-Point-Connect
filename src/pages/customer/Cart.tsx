@@ -5,7 +5,7 @@ import { useShop } from '@/src/contexts/ShopContext';
 import { Button } from '@/src/components/ui/Button';
 
 export default function Cart() {
-  const { cart, products, removeFromCart, updateCartItem } = useShop();
+  const { cart, products, removeFromCart, updateCartItem, convertPrice } = useShop();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isCancelled = searchParams.get('cancelled') === 'true';
@@ -83,7 +83,7 @@ export default function Cart() {
                       <h3 className="font-semibold text-lg text-navy">{item.product?.name}</h3>
                     </Link>
                     <div className="font-bold text-navy whitespace-nowrap">
-                      ${((item.product?.salePrice || item.product?.price || 0) * item.quantity).toFixed(2)}
+                      {convertPrice((item.product?.salePrice || item.product?.price || 0) * item.quantity)}
                     </div>
                   </div>
                   
@@ -92,7 +92,7 @@ export default function Cart() {
                     {item.recipient && <p><span className="font-medium text-navy">For:</span> {item.recipient}</p>}
                     {item.deliveryDate && <p><span className="font-medium text-navy">Date:</span> {new Date(item.deliveryDate).toLocaleDateString()}</p>}
                     {item.giftMessage && <p className="italic line-clamp-1">"{item.giftMessage}"</p>}
-                    {item.includeGreetingCard && <p className="text-dpc-blue">+ Premium Greeting Card ($5.00)</p>}
+                    {item.includeGreetingCard && <p className="text-dpc-blue">+ Premium Greeting Card ({convertPrice(5 * item.quantity)})</p>}
                   </div>
 
                   {/* Actions */}
@@ -134,20 +134,20 @@ export default function Cart() {
               <div className="space-y-4 mb-6 text-sm text-text">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span className="font-medium">${subtotal.toFixed(2)}</span>
+                  <span className="font-medium">{convertPrice(subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Delivery Fee</span>
-                  <span className="font-medium">${deliveryFee.toFixed(2)}</span>
+                  <span className="font-medium">{convertPrice(deliveryFee)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Service Fee</span>
-                  <span className="font-medium">${serviceFee.toFixed(2)}</span>
+                  <span className="font-medium">{convertPrice(serviceFee)}</span>
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Discount</span>
-                    <span className="font-medium">-${discount.toFixed(2)}</span>
+                    <span className="font-medium">-{convertPrice(discount)}</span>
                   </div>
                 )}
               </div>
@@ -155,7 +155,7 @@ export default function Cart() {
               <div className="border-t border-neutral-200 pt-4 mb-6">
                 <div className="flex justify-between items-center text-lg">
                   <span className="font-bold text-navy">Total</span>
-                  <span className="font-bold text-dpc-blue text-2xl">${total.toFixed(2)}</span>
+                  <span className="font-bold text-dpc-blue text-2xl">{convertPrice(total)}</span>
                 </div>
                 <p className="text-xs text-text-muted mt-1 text-right">Includes taxes</p>
               </div>

@@ -7,7 +7,7 @@ import { mockRecipients, mockOccasions } from '@/src/lib/mockData';
 import { useShop } from '@/src/contexts/ShopContext';
 
 export default function Shop() {
-  const { products, categories } = useShop();
+  const { products, categories, currencySymbol } = useShop();
   const [searchParams, setSearchParams] = useSearchParams();
   const { categorySlug, collectionSlug } = useParams();
   
@@ -35,7 +35,11 @@ export default function Shop() {
       // 2. Category
       if (categorySlug) {
         const category = categories.find(c => c.slug === categorySlug);
-        if (category && p.primaryCategoryId !== category.slug) {
+        const matchesCategory = (category && p.primaryCategoryId === category.slug) ||
+          p.primaryCategoryId === categorySlug ||
+          (categorySlug === 'groceries' && (p.primaryCategoryId === 'family-support' || p.primaryCategoryId === 'groceries' || p.primaryCategoryId === 'home')) ||
+          (categorySlug === 'family-support' && (p.primaryCategoryId === 'groceries' || p.primaryCategoryId === 'family-support'));
+        if (!matchesCategory) {
           return false;
         }
       }
@@ -196,7 +200,7 @@ export default function Shop() {
 
               {/* Price Filter */}
               <div>
-                <h3 className="font-display font-semibold text-lg text-navy mb-4 border-b border-neutral-border pb-2">Price</h3>
+                <h3 className="font-display font-semibold text-lg text-navy mb-4 border-b border-neutral-border pb-2">Price ({currencySymbol})</h3>
                 <div className="flex items-center gap-2">
                   <input 
                     type="number" 

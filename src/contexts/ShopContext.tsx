@@ -35,6 +35,12 @@ interface ShopContextType {
   clearCart: () => void;
   cartCount: number;
   
+  // Currency Management
+  currency: 'USD' | 'KES' | 'GBP' | 'EUR';
+  setCurrency: (currency: 'USD' | 'KES' | 'GBP' | 'EUR') => void;
+  convertPrice: (price: number) => string;
+  currencySymbol: string;
+  
   // Live Storefront <-> Admin Catalog Linkage
   products: Product[];
   categories: Category[];
@@ -56,6 +62,7 @@ const ShopContext = createContext<ShopContextType | undefined>(undefined);
 export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [currency, setCurrencyState] = useState<'USD' | 'KES' | 'GBP' | 'EUR'>('USD');
   
   // Dynamic live entities synced with Admin
   const [products, setProducts] = useState<Product[]>([]);
@@ -65,6 +72,38 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [giftConfig, setGiftConfig] = useState<GiftBuilderConfig>(() => getStoredGiftConfig());
   const [cmsSections, setCmsSections] = useState<CmsSection[]>([]);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+
+  // Conversion rates (Fixed for demo purposes)
+  const rates = {
+    USD: 1,
+    KES: 135.50,
+    GBP: 0.78,
+    EUR: 0.92
+  };
+
+  const currencySymbols = {
+    USD: '$',
+    KES: 'KSh',
+    GBP: '£',
+    EUR: '€'
+  };
+
+  const setCurrency = (newCurrency: 'USD' | 'KES' | 'GBP' | 'EUR') => {
+    setCurrencyState(newCurrency);
+    localStorage.setItem('dpc_currency', newCurrency);
+  };
+
+  const convertPrice = useCallback((priceInUSD: number) => {
+    const rate = rates[currency];
+    const converted = priceInUSD * rate;
+    
+    if (currency === 'KES') {
+      return `${currencySymbols[currency]} ${Math.round(converted).toLocaleString()}`;
+    }
+    return `${currencySymbols[currency]}${converted.toFixed(2)}`;
+  }, [currency]);
+
+  const currencySymbol = currencySymbols[currency];
 
   const refreshCatalog = useCallback(() => {
     setProducts(getStoredProducts());
@@ -78,6 +117,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   // Initial load
   useEffect(() => {
     refreshCatalog();
+
+    const savedCurrency = localStorage.getItem('dpc_currency') as any;
+    if (savedCurrency && ['USD', 'KES', 'GBP', 'EUR'].includes(savedCurrency)) {
+      setCurrencyState(savedCurrency);
+    }
 
     const savedWishlist = localStorage.getItem('dpc_wishlist');
     if (savedWishlist) {
@@ -209,6 +253,10 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
       updateCartItem, 
       clearCart, 
       cartCount,
+      currency,
+      setCurrency,
+      convertPrice,
+      currencySymbol,
       products,
       categories,
       deliveryZones,

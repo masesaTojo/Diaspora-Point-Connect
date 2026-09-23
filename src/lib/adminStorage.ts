@@ -276,6 +276,17 @@ export function getStoredProducts(): Product[] {
     if (data) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // Merge any newly introduced mock products (e.g. fresh groceries)
+        let modified = false;
+        (mockProducts as Product[]).forEach(mp => {
+          if (!parsed.some(p => p.id === mp.id)) {
+            parsed.push(mp);
+            modified = true;
+          }
+        });
+        if (modified) {
+          saveStoredProducts(parsed);
+        }
         return parsed;
       }
     }
@@ -301,6 +312,12 @@ export function getStoredCategories(): Category[] {
     if (data) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // Ensure new standard categories like groceries are present
+        const hasGroceries = parsed.some((c: Category) => c.slug === 'groceries');
+        if (!hasGroceries) {
+          parsed.splice(2, 0, { id: 'c-groc', name: 'Groceries & Essentials', slug: 'groceries', isActive: true });
+          saveStoredCategories(parsed);
+        }
         return parsed;
       }
     }

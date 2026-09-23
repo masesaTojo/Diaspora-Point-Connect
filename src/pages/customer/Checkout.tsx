@@ -41,7 +41,10 @@ export default function Checkout() {
     appliedCoupon, 
     applyCoupon, 
     removeCoupon, 
-    placeOrder 
+    placeOrder,
+    currency,
+    convertPrice,
+    currencySymbol
   } = useShop();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -94,9 +97,12 @@ export default function Checkout() {
   const [deliveryErrors, setDeliveryErrors] = useState<{ [key: string]: string }>({});
 
   // Payment Options & Simulation
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'mpesa'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'mpesa' | 'pesapal'>('card');
   const [paymentSimulation, setPaymentSimulation] = useState<'success' | 'failed'>('success');
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  
+  // PesaPal state
+  const [pesapalIframeUrl, setPesapalIframeUrl] = useState<string | null>(null);
   
   // Card mock state
   const [cardDetails, setCardDetails] = useState({
@@ -253,6 +259,17 @@ export default function Checkout() {
   const handleCancelPayment = () => {
     // User cancels the payment transaction - safely return to cart with notice
     navigate('/cart?cancelled=true');
+  };
+
+  const handlePesaPalPayment = () => {
+    setIsProcessing(true);
+    // Simulate getting a PesaPal redirect URL from a backend
+    setTimeout(() => {
+      // Mock URL that would normally point to PesaPal's payment page
+      const mockUrl = `https://demo.pesapal.com/api/PostPesapalDirectOrderV4?OrderAmount=${total}&Currency=${currency}&Description=DiasporaParcelOrder`;
+      setPesapalIframeUrl(mockUrl);
+      setIsProcessing(false);
+    }, 1000);
   };
 
   const handlePlaceOrder = async () => {
@@ -618,7 +635,7 @@ export default function Checkout() {
                       <option value="">-- Select delivery zone --</option>
                       {deliveryZones.map(zone => (
                         <option key={zone.id} value={zone.name}>
-                          {zone.name} — Fee: ${zone.fee.toFixed(2)} ({zone.estimatedTime})
+                          {zone.name} — Fee: {convertPrice(zone.fee)} ({zone.estimatedTime})
                         </option>
                       ))}
                     </select>
@@ -839,6 +856,60 @@ export default function Checkout() {
                       <p className="text-xs text-text-muted">A prompt will pop up on this phone asking for your M-Pesa PIN.</p>
                     </div>
                   )}
+
+                  <label className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all ${paymentMethod === 'pesapal' ? 'border-dpc-blue bg-blue-50/50 shadow-xs' : 'border-neutral-200 hover:bg-neutral-50'}`}>
+                    <input 
+                      type="radio" 
+                      name="payment" 
+                      checked={paymentMethod === 'pesapal'} 
+                      onChange={() => setPaymentMethod('pesapal')}
+                      className="text-dpc-blue" 
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-navy">PesaPal (Card, M-Pesa, Airtel Money)</span>
+                        <div className="flex gap-1 items-center">
+                          <img src="https://www.pesapal.com/images/pesapal_logo.png" alt="PesaPal" className="h-6" onError={(e) => e.currentTarget.src = "https://placehold.co/100x40?text=PesaPal"} />
+                        </div>
+                      </div>
+                      <span className="block text-xs text-text-muted mt-0.5">Secure payment via PesaPal gateway</span>
+                    </div>
+                  </label>
+
+                  {paymentMethod === 'pesapal' && !pesapalIframeUrl && (
+                    <div className="p-6 bg-neutral-50 rounded-xl border border-neutral-200 text-center">
+                      <p className="text-sm text-navy font-semibold mb-4">You will be redirected to PesaPal to complete your payment of {convertPrice(total)}</p>
+                      <Button onClick={handlePesaPalPayment} className="w-full">
+                        Initialize PesaPal Payment
+                      </Button>
+                    </div>
+                  )}
+
+                  {paymentMethod === 'pesapal' && pesapalIframeUrl && (
+                    <div className="mt-4 p-4 bg-white rounded-xl border border-neutral-200">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-navy">Secure PesaPal Checkout</h3>
+                        <Button variant="ghost" size="sm" onClick={() => setPesapalIframeUrl(null)}>Cancel</Button>
+                      </div>
+                      <div className="aspect-[4/3] bg-neutral-100 rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-neutral-300 relative overflow-hidden">
+                        {/* In a real app, this would be an iframe to pesapalIframeUrl */}
+                        <div className="p-8 text-center">
+                          <ShieldCheck className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                          <p className="text-navy font-bold mb-2">Simulated PesaPal Secure Portal</p>
+                          <p className="text-xs text-text-muted mb-6">In a live environment, the PesaPal payment form would load here.</p>
+                          <Button 
+                            onClick={handlePlaceOrder}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            Simulate Successful Payment
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-center text-text-muted mt-4 uppercase tracking-widest font-bold">
+                        Secured by PesaPal 256-bit Encryption
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4 mt-8">
@@ -969,13 +1040,13 @@ export default function Checkout() {
                           <div className="flex-1 text-sm">
                             <div className="flex justify-between">
                               <span className="font-semibold text-navy">{item.product?.name}</span>
-                              <span className="font-bold text-navy">${((item.product?.salePrice || item.product?.price || 0) * item.quantity).toFixed(2)}</span>
+                              <span className="font-bold text-navy">{convertPrice((item.product?.salePrice || item.product?.price || 0) * item.quantity)}</span>
                             </div>
                             <div className="text-xs text-text-muted mt-1 space-y-0.5">
                               <p>Qty: {item.quantity}</p>
                               {item.recipient && <p className="font-medium text-purple-700">Gift For: {item.recipient}</p>}
                               {item.giftMessage && <p className="italic text-neutral-600">"{item.giftMessage}"</p>}
-                              {item.includeGreetingCard && <p className="text-dpc-blue">+ Premium Greeting Card ($5.00)</p>}
+                              {item.includeGreetingCard && <p className="text-dpc-blue">+ Premium Greeting Card ({convertPrice(5 * item.quantity)})</p>}
                             </div>
                           </div>
                         </div>
@@ -1007,7 +1078,7 @@ export default function Checkout() {
                         <RefreshCw className="w-4 h-4 animate-spin" /> Authorizing Payment...
                       </span>
                     ) : (
-                      `Place Order ($${total.toFixed(2)})`
+                      `Place Order (${convertPrice(total)})`
                     )}
                   </Button>
                 </div>
@@ -1049,7 +1120,7 @@ export default function Checkout() {
 
                   <div className="flex justify-between items-center text-sm pt-1">
                     <span className="font-bold text-navy">Total Paid</span>
-                    <span className="font-bold text-navy text-lg">${total.toFixed(2)}</span>
+                    <span className="font-bold text-navy text-lg">{convertPrice(total)}</span>
                   </div>
                 </div>
 
@@ -1086,7 +1157,7 @@ export default function Checkout() {
                         {item.recipient && <p className="text-[11px] text-purple-700">For: {item.recipient}</p>}
                       </div>
                       <div className="font-medium text-navy text-sm">
-                        ${((item.product?.salePrice || item.product?.price || 0) * item.quantity).toFixed(2)}
+                        {convertPrice((item.product?.salePrice || item.product?.price || 0) * item.quantity)}
                       </div>
                     </div>
                   ))}
@@ -1101,7 +1172,7 @@ export default function Checkout() {
                         <div>
                           <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">{appliedCoupon.code}</span>
                           <span className="block text-xs text-emerald-700">
-                            {appliedCoupon.type === 'PERCENTAGE' ? `${appliedCoupon.value}% OFF` : `$${appliedCoupon.value} OFF`} applied
+                            {appliedCoupon.type === 'PERCENTAGE' ? `${appliedCoupon.value}% OFF` : `${convertPrice(appliedCoupon.value)} OFF`} applied
                           </span>
                         </div>
                       </div>
@@ -1161,27 +1232,27 @@ export default function Checkout() {
                 <div className="border-t border-neutral-200 pt-4 space-y-2 text-sm text-text mb-4">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
-                    <span className="font-medium">${subtotal.toFixed(2)}</span>
+                    <span className="font-medium">{convertPrice(subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Delivery Zone ({delivery.city || 'Standard'})</span>
-                    <span className="font-medium">${deliveryFee.toFixed(2)}</span>
+                    <span className="font-medium">{convertPrice(deliveryFee)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Service Fee</span>
-                    <span className="font-medium">${serviceFee.toFixed(2)}</span>
+                    <span className="font-medium">{convertPrice(serviceFee)}</span>
                   </div>
                   {discount > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Discount ({appliedCoupon?.code})</span>
-                      <span className="font-medium">-${discount.toFixed(2)}</span>
+                      <span className="font-medium">-{convertPrice(discount)}</span>
                     </div>
                   )}
                 </div>
                 
                 <div className="border-t border-neutral-200 pt-4 flex justify-between items-center text-lg">
                   <span className="font-bold text-navy">Total</span>
-                  <span className="font-bold text-dpc-blue text-xl">${total.toFixed(2)}</span>
+                  <span className="font-bold text-dpc-blue text-xl">{convertPrice(total)}</span>
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-neutral-100 text-xs text-text-muted space-y-1">

@@ -348,7 +348,7 @@ export interface Advertiser {
   id: string;
   businessName: string;
   tagline: string;
-  category: 'Banking & Mortgages' | 'Real Estate & Land' | 'Building & Construction' | 'Flights & Travel' | 'Legal & Relocation' | 'Healthcare';
+  category: 'Banking & Mortgages' | 'Real Estate & Land' | 'Building & Construction' | 'Construction & Home Services' | 'Professional Services' | 'Flights & Travel' | 'Legal & Relocation' | 'Healthcare';
   description: string;
   logo: string;
   bannerImage: string;

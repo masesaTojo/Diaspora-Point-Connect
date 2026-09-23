@@ -15,6 +15,14 @@ import Account from './pages/customer/Account';
 import GiftBuilder from './pages/customer/GiftBuilder';
 import Rentals from './pages/customer/Rentals';
 import Advertise from './pages/customer/Advertise';
+import TrackOrder from './pages/customer/TrackOrder';
+import Support from './pages/customer/Support';
+import FAQ from './pages/customer/FAQ';
+import Shipping from './pages/customer/Shipping';
+import Returns from './pages/customer/Returns';
+import PropertyForSale from './pages/customer/PropertyForSale';
+import BusinessDirectory from './pages/customer/BusinessDirectory';
+import AboutUs from './pages/customer/AboutUs';
 
 // Admin Pages
 import Dashboard from './pages/admin/Dashboard';
@@ -48,13 +56,19 @@ export default function App() {
             <Route path="account" element={<Account />} />
             <Route path="gift-builder" element={<GiftBuilder />} />
             <Route path="rentals" element={<Rentals />} />
+            <Route path="places-to-stay" element={<Rentals />} />
+            <Route path="property-for-sale" element={<PropertyForSale />} />
+            <Route path="business-directory" element={<BusinessDirectory />} />
+            <Route path="about" element={<AboutUs />} />
+            <Route path="about-us" element={<AboutUs />} />
             <Route path="advertise" element={<Advertise />} />
-            <Route path="advertisers" element={<Advertise />} />
-            <Route path="support" element={<div className="p-12 text-center text-text-muted">Support Placeholder</div>} />
-            <Route path="track" element={<div className="p-12 text-center text-text-muted">Track Order Placeholder</div>} />
-            <Route path="faq" element={<div className="p-12 text-center text-text-muted">FAQ Placeholder</div>} />
-            <Route path="shipping" element={<div className="p-12 text-center text-text-muted">Shipping Placeholder</div>} />
-            <Route path="returns" element={<div className="p-12 text-center text-text-muted">Returns Placeholder</div>} />
+            <Route path="advertisers" element={<BusinessDirectory />} />
+            <Route path="support" element={<Support />} />
+            <Route path="contact" element={<AboutUs />} />
+            <Route path="track" element={<TrackOrder />} />
+            <Route path="faq" element={<FAQ />} />
+            <Route path="shipping" element={<Shipping />} />
+            <Route path="returns" element={<Returns />} />
           </Route>
 
         {/* Control Center Routes */}

@@ -7,7 +7,7 @@ import { useShop } from '@/src/contexts/ShopContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function GiftBuilder() {
-  const { addToCart, products, giftConfig } = useShop();
+  const { addToCart, products, giftConfig, convertPrice } = useShop();
   const navigate = useNavigate();
   
   const [step, setStep] = useState(1);
@@ -82,7 +82,7 @@ export default function GiftBuilder() {
                         <div className="flex-1 flex flex-col justify-between">
                           <div>
                             <h3 className="font-bold text-navy leading-tight mb-1">{product.name}</h3>
-                            <div className="text-dpc-blue font-bold">${(product.salePrice || product.price).toFixed(2)}</div>
+                            <div className="text-dpc-blue font-bold">{convertPrice(product.salePrice || product.price)}</div>
                           </div>
                           <div className="self-end">
                             <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? 'bg-dpc-blue border-dpc-blue text-white' : 'border-neutral-300 text-transparent'}`}>
@@ -157,7 +157,7 @@ export default function GiftBuilder() {
                         <img src={p.images[0]} alt="" className="w-12 h-12 object-cover rounded bg-neutral-100 shrink-0" />
                         <div className="flex-1 text-sm">
                           <p className="font-bold text-navy line-clamp-1">{p.name}</p>
-                          <p className="text-dpc-blue font-medium">${(p.salePrice || p.price).toFixed(2)}</p>
+                          <p className="text-dpc-blue font-medium">{convertPrice(p.salePrice || p.price)}</p>
                         </div>
                       </div>
                     ))}
@@ -166,17 +166,17 @@ export default function GiftBuilder() {
                   <div className="border-t border-neutral-200 pt-4 space-y-2 text-sm">
                     <div className="flex justify-between text-text-muted">
                       <span>Subtotal</span>
-                      <span>${calculateSubtotal().toFixed(2)}</span>
+                      <span>{convertPrice(calculateSubtotal())}</span>
                     </div>
                     {discount > 0 && (
                       <div className="flex justify-between text-green-600">
                         <span>Bundle Discount (10%)</span>
-                        <span>-${discount.toFixed(2)}</span>
+                        <span>-{convertPrice(discount)}</span>
                       </div>
                     )}
                     <div className="flex justify-between font-bold text-lg text-navy pt-2 border-t border-neutral-100">
                       <span>Box Total</span>
-                      <span>${total.toFixed(2)}</span>
+                      <span>{convertPrice(total)}</span>
                     </div>
                   </div>
                 </>

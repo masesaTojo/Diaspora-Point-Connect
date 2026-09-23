@@ -34,10 +34,12 @@ import {
 import { Button } from '@/src/components/ui/Button';
 import { mockHouseRentals } from '@/src/lib/rentalsAndAdsData';
 import { HouseRental, RentalInquiry } from '@/src/types';
+import { useShop } from '@/src/contexts/ShopContext';
 
 export default function Rentals() {
   const [searchParams] = useSearchParams();
   const cityParam = searchParams.get('city');
+  const { convertPrice, currency, setCurrency } = useShop();
 
   const [rentals, setRentals] = useState<HouseRental[]>(mockHouseRentals);
   const [selectedCity, setSelectedCity] = useState<string>(cityParam || 'ALL');
@@ -51,7 +53,6 @@ export default function Rentals() {
   const [selectedType, setSelectedType] = useState<string>('ALL');
   const [selectedStayType, setSelectedStayType] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [currency, setCurrency] = useState<'USD' | 'KES'>('USD');
   const [maxPrice, setMaxPrice] = useState<number>(250);
   const [generatorOnly, setGeneratorOnly] = useState<boolean>(false);
   const [poolOnly, setPoolOnly] = useState<boolean>(false);
@@ -97,9 +98,7 @@ export default function Rentals() {
 
   // Currency converter
   const formatPrice = (usd: number) => {
-    if (currency === 'USD') return `$${usd}`;
-    const kes = Math.round(usd * 130);
-    return `KES ${kes.toLocaleString()}`;
+    return convertPrice(usd);
   };
 
   // Filter rentals
@@ -305,18 +304,15 @@ export default function Rentals() {
             {/* Currency Switcher & Host Button */}
             <div className="flex items-center gap-3 ml-auto">
               <div className="inline-flex rounded-lg border border-neutral-200 p-0.5 bg-neutral-100 text-xs">
-                <button 
-                  onClick={() => setCurrency('USD')}
-                  className={`px-2.5 py-1 rounded-md font-semibold transition-all ${currency === 'USD' ? 'bg-white text-navy shadow-xs font-bold' : 'text-text-muted'}`}
-                >
-                  USD ($)
-                </button>
-                <button 
-                  onClick={() => setCurrency('KES')}
-                  className={`px-2.5 py-1 rounded-md font-semibold transition-all ${currency === 'KES' ? 'bg-white text-navy shadow-xs font-bold' : 'text-text-muted'}`}
-                >
-                  KES (Ksh)
-                </button>
+                {(['USD', 'KES', 'GBP', 'EUR'] as const).map((curr) => (
+                  <button 
+                    key={curr}
+                    onClick={() => setCurrency(curr)}
+                    className={`px-2 py-1 rounded-md font-semibold transition-all ${currency === curr ? 'bg-white text-navy shadow-xs font-bold' : 'text-text-muted hover:text-navy'}`}
+                  >
+                    {curr}
+                  </button>
+                ))}
               </div>
 
               <Button 

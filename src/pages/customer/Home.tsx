@@ -10,7 +10,7 @@ import { AdvertisersSection } from '@/src/components/sections/AdvertisersSection
 import { useShop } from '@/src/contexts/ShopContext';
 
 export default function Home() {
-  const { products, cmsSections } = useShop();
+  const { products, cmsSections, convertPrice } = useShop();
 
   const isSectionVisible = (type: string) => {
     const section = cmsSections.find(s => s.type === type);
@@ -211,10 +211,10 @@ export default function Home() {
               <SectionHeading title="Shop by Budget" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
-                  { label: "Gifts under $25", min: 0, max: 25 },
-                  { label: "Gifts $25 - $50", min: 25, max: 50 },
-                  { label: "Gifts $50 - $100", min: 50, max: 100 },
-                  { label: "Premium Gifts $100+", min: 100, max: 9999 }
+                  { label: `Gifts under ${convertPrice(25)}`, min: 0, max: 25 },
+                  { label: `Gifts ${convertPrice(25)} - ${convertPrice(50)}`, min: 25, max: 50 },
+                  { label: `Gifts ${convertPrice(50)} - ${convertPrice(100)}`, min: 50, max: 100 },
+                  { label: `Premium Gifts ${convertPrice(100)}+`, min: 100, max: 9999 }
                 ].map((budget, i) => (
                   <Link to={`/shop?minPrice=${budget.min}&maxPrice=${budget.max}`} key={i} className="bg-white p-6 rounded-xl shadow-sm border border-neutral-100 flex justify-between items-center cursor-pointer hover:border-dpc-blue hover:shadow-md transition-all group block">
                     <span className="font-semibold text-navy text-lg">{budget.label}</span>
@@ -347,7 +347,7 @@ export default function Home() {
 
                 <div className="p-5 pt-0 flex items-center justify-between border-t border-neutral-100 mt-2">
                   <div>
-                    <span className="text-lg font-bold text-navy">${rental.pricePerNight}</span>
+                    <span className="text-lg font-bold text-navy">{convertPrice(rental.pricePerNight)}</span>
                     <span className="text-xs text-text-muted"> / night</span>
                   </div>
                   <Link to="/rentals">

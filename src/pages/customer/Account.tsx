@@ -19,11 +19,14 @@ import {
   Calendar,
   AlertCircle,
   RefreshCw,
-  Check
+  Check,
+  Heart,
+  ShoppingBag
 } from 'lucide-react';
 import { Order, OrderStatus } from '@/src/types';
 import { Button } from '@/src/components/ui/Button';
 import { getStoredOrders, subscribeToStorage } from '@/src/lib/adminStorage';
+import { useShop } from '@/src/contexts/ShopContext';
 
 interface SavedRecipient {
   id: string;
@@ -35,7 +38,8 @@ interface SavedRecipient {
 
 export default function Account() {
   const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState('orders');
+  const { convertPrice, wishlist, toggleWishlist, addToCart, products } = useShop();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'orders');
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
@@ -43,6 +47,13 @@ export default function Account() {
   const [recipients, setRecipients] = useState<SavedRecipient[]>([]);
   const [isEditingRecipient, setIsEditingRecipient] = useState<boolean>(false);
   const [currentRecipient, setCurrentRecipient] = useState<Partial<SavedRecipient>>({});
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const loadData = () => {
@@ -243,6 +254,17 @@ export default function Account() {
                   </span>
                 </button>
                 <button 
+                  onClick={() => { setActiveTab('wishlist'); setSelectedOrder(null); }}
+                  className={`w-full text-left px-4 py-3 rounded-lg flex items-center justify-between transition-colors ${activeTab === 'wishlist' ? 'bg-blue-50 text-dpc-blue font-semibold' : 'text-text hover:bg-neutral-50'}`}
+                >
+                  <span className="flex items-center gap-3">
+                    <Heart className="w-5 h-5" /> Saved Wishlist
+                  </span>
+                  <span className="text-xs bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full font-bold">
+                    {wishlist.length}
+                  </span>
+                </button>
+                <button 
                   onClick={() => { setActiveTab('recipients'); setSelectedOrder(null); }}
                   className={`w-full text-left px-4 py-3 rounded-lg flex items-center justify-between transition-colors ${activeTab === 'recipients' ? 'bg-blue-50 text-dpc-blue font-semibold' : 'text-text hover:bg-neutral-50'}`}
                 >
@@ -309,7 +331,7 @@ export default function Account() {
                               </div>
                               <div className="text-right">
                                 <span className="text-xs text-text-muted block">Total</span>
-                                <span className="font-bold text-navy text-lg">${order.total?.toFixed(2)}</span>
+                                <span className="font-bold text-navy text-lg">{convertPrice(order.total)}</span>
                               </div>
                             </div>
                             
@@ -469,7 +491,7 @@ export default function Account() {
                               <p className="font-semibold text-navy text-base">{item.productName}</p>
                               <div className="flex flex-wrap gap-3 text-xs text-text-muted">
                                 <span>Quantity: <strong className="text-navy">{item.quantity}</strong></span>
-                                <span>Unit Price: ${item.unitPrice?.toFixed(2)}</span>
+                                <span>Unit Price: {convertPrice(item.unitPrice)}</span>
                                 {item.recipient && (
                                   <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-medium border border-purple-100">
                                     Recipient Tag: {item.recipient}
@@ -488,7 +510,7 @@ export default function Account() {
                               )}
                             </div>
                             <div className="font-bold text-navy text-base whitespace-nowrap">
-                              ${item.totalPrice?.toFixed(2)}
+                              {convertPrice(item.totalPrice)}
                             </div>
                           </div>
                         ))}
@@ -501,23 +523,97 @@ export default function Account() {
                       <div className="space-y-2 text-sm text-text">
                         <div className="flex justify-between">
                           <span className="text-text-muted">Subtotal</span>
-                          <span className="font-medium">${selectedOrder.subtotal?.toFixed(2)}</span>
+                          <span className="font-medium">{convertPrice(selectedOrder.subtotal)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-text-muted">Delivery Fee ({selectedOrder.deliveryCity || 'Standard'})</span>
-                          <span className="font-medium">${selectedOrder.deliveryFee?.toFixed(2)}</span>
+                          <span className="font-medium">{convertPrice(selectedOrder.deliveryFee)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-text-muted">Service Fee</span>
-                          <span className="font-medium">${selectedOrder.serviceFee?.toFixed(2)}</span>
+                          <span className="font-medium">{convertPrice(selectedOrder.serviceFee)}</span>
                         </div>
                         <div className="flex justify-between font-bold text-navy text-base pt-3 border-t border-neutral-200">
                           <span>Total Amount Paid</span>
-                          <span className="text-dpc-blue">${selectedOrder.total?.toFixed(2)}</span>
+                          <span className="text-dpc-blue">{convertPrice(selectedOrder.total)}</span>
                         </div>
                       </div>
                     </div>
 
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'wishlist' && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-display font-bold text-navy mb-1">My Saved Wishlist</h2>
+                    <p className="text-text-muted text-sm">Gifts and items you've saved to purchase for family and friends in Kenya.</p>
+                  </div>
+                  <Link to="/shop">
+                    <Button variant="outline" size="sm">Browse More Gifts</Button>
+                  </Link>
+                </div>
+
+                {wishlist.length === 0 ? (
+                  <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center shadow-sm">
+                    <Heart className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-navy mb-2">Your wishlist is empty</h3>
+                    <p className="text-text-muted mb-6">You haven't saved any items yet. Click the heart icon on any product to save it here.</p>
+                    <Link to="/shop">
+                      <Button size="lg">Explore Gift Catalog</Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                    {wishlist.map(productId => {
+                      const product = products.find(p => p.id === productId);
+                      if (!product) return null;
+                      return (
+                        <div key={product.id} className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col">
+                          <Link to={`/product/${product.slug || product.id}`} className="block relative aspect-square bg-neutral-100 overflow-hidden">
+                            <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                          </Link>
+                          <div className="p-4 flex-1 flex flex-col justify-between">
+                            <div>
+                              <Link to={`/product/${product.slug || product.id}`}>
+                                <h4 className="font-bold text-navy hover:text-dpc-blue transition-colors line-clamp-1">{product.name}</h4>
+                              </Link>
+                              <div className="mt-1 font-bold text-navy">
+                                {product.salePrice ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-red-600">{convertPrice(product.salePrice)}</span>
+                                    <span className="text-xs text-text-muted line-through">{convertPrice(product.price)}</span>
+                                  </div>
+                                ) : (
+                                  <span>{convertPrice(product.price)}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="mt-4 pt-3 border-t border-neutral-100 flex gap-2">
+                              <Button 
+                                size="sm" 
+                                className="flex-1 flex items-center justify-center gap-1.5"
+                                onClick={() => addToCart({ productId: product.id, quantity: 1 })}
+                              >
+                                <ShoppingBag className="w-4 h-4" /> Add to Cart
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-red-600 hover:bg-red-50 hover:text-red-700 p-2"
+                                title="Remove from Wishlist"
+                                onClick={() => toggleWishlist(product.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

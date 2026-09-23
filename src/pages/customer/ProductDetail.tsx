@@ -10,7 +10,7 @@ import { useShop } from '@/src/contexts/ShopContext';
 export default function ProductDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const { products, addToCart, toggleWishlist, wishlist } = useShop();
+  const { products, addToCart, toggleWishlist, wishlist, convertPrice } = useShop();
   
   const product = products.find(p => p.slug === slug || p.id === slug);
   
@@ -143,7 +143,16 @@ export default function ProductDetail() {
               )}
             </div>
 
-            <div className="text-3xl font-bold text-navy mb-6">              {product.salePrice ? (                <div className="flex items-center gap-3">                  <span className="text-red-600">${product.salePrice.toFixed(2)}</span>                  <span className="text-xl text-text-muted line-through">${product.price?.toFixed(2)}</span>                </div>              ) : (                <span>${product.price?.toFixed(2)}</span>              )}            </div>
+            <div className="text-3xl font-bold text-navy mb-6">
+              {product.salePrice ? (
+                <div className="flex items-center gap-3">
+                  <span className="text-red-600">{convertPrice(product.salePrice)}</span>
+                  <span className="text-xl text-text-muted line-through">{convertPrice(product.price || 0)}</span>
+                </div>
+              ) : (
+                <span>{convertPrice(product.price || 0)}</span>
+              )}
+            </div>
 
             <p className="text-text text-lg leading-relaxed mb-8">
               {product.description}
@@ -233,7 +242,7 @@ export default function ProductDetail() {
                 />
                 <div className="flex-1">
                   <span className="block font-medium text-navy">Add a premium greeting card</span>
-                  <span className="block text-sm text-text-muted">+$5.00</span>
+                  <span className="block text-sm text-text-muted">+{convertPrice(5)}</span>
                 </div>
               </label>
 
