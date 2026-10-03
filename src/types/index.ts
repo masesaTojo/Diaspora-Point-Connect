@@ -287,6 +287,59 @@ export interface Order {
   updatedAt: string;
 }
 
+export interface PropertyUnitType {
+  type: string;
+  size: string;
+  price?: number | string;
+}
+
+export interface Property {
+  id: string;
+  referenceNumber: string; // e.g. DPC-001
+  originalProjectName: string; // admin only
+  publicListingName: string; // displayed to clients
+  location: string;
+  neighborhood: string;
+  city: string;
+  developer: string;
+  propertyCompany: string;
+  unitTypes: PropertyUnitType[];
+  currentPrice: number | string;
+  availableUnits: number;
+  paymentPlan: string;
+  expectedCompletionDate: string;
+  commissionRate: string; // admin only
+  commissionTerms: string; // admin only
+  contactDetails: string; // admin only (Developer/Agent Contact Details)
+  status: 'Available' | 'Reserved' | 'Sold';
+  internalNotes: string; // admin only
+  lastUpdated: string;
+  completionYear: string; // for compatibility with existing components
+  
+  // New requested fields
+  indicativeROI: string;
+  priceByUnitType?: string; // admin only
+  exactProjectAddress?: string; // admin only
+  googleMapsLocation?: string; // admin only
+  parkingDetails?: string;
+  serviceCharge?: string;
+  informationSource?: string; // admin only
+  
+  // Existing fields from PropertyListing to maintain compatibility
+  type: 'Apartment' | 'New Development' | 'Villa / Townhouse';
+  priceUSD: number; // for conversion logic
+  bedrooms: number;
+  bathrooms: number;
+  areaSqFt: number;
+  isVerified: boolean;
+  isNewDevelopment: boolean;
+  images: string[];
+  description: string;
+  amenities: string[];
+  rentalYield: string;
+  titleStatus: 'Freehold Title Deed' | 'Sectional Title Deed (99 Yrs)' | 'Under Registration';
+}
+
 export interface HouseRental {
   id: string;
   title: string;

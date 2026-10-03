@@ -21,7 +21,8 @@ import {
   Store,
   CheckCircle2,
   AlertTriangle,
-  Info
+  Info,
+  Building2
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { Button } from '@/src/components/ui/Button';
@@ -39,6 +40,7 @@ const navGroups = [
     items: [
       { name: 'Sales & Orders', path: '/admin/sales', icon: ShoppingBag },
       { name: 'Catalog', path: '/admin/catalog', icon: Package },
+      { name: 'Properties', path: '/admin/properties', icon: Building2 },
       { name: 'Inventory', path: '/admin/inventory', icon: Box },
       { name: 'Logistics', path: '/admin/logistics', icon: Truck },
     ]

@@ -22,73 +22,94 @@ import {
   X, 
   PhoneCall, 
   Send,
-  Users
+  Users,
+  DollarSign,
+  BarChart
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 import { useShop } from '@/src/contexts/ShopContext';
+import { Property } from '@/src/types';
 
-export interface PropertyListing {
-  id: string;
-  title: string;
-  type: 'Apartment' | 'New Development' | 'Villa / Townhouse';
-  location: string;
-  neighborhood: string;
-  city: string;
-  priceUSD: number;
-  bedrooms: number;
-  bathrooms: number;
-  areaSqFt: number;
-  completionYear: string;
-  titleStatus: 'Freehold Title Deed' | 'Sectional Title Deed (99 Yrs)' | 'Under Registration';
-  developer: string;
-  isVerified: boolean;
-  isNewDevelopment: boolean;
-  images: string[];
-  description: string;
-  amenities: string[];
-  rentalYield: string;
-}
-
-export const mockProperties: PropertyListing[] = [
+export const mockProperties: Property[] = [
   {
     id: 'prop-1',
-    title: 'The Skyward Residences - Premium 2 & 3 Bedroom Apartments',
+    referenceNumber: 'DPC-001',
+    originalProjectName: 'San Remo Heights',
+    publicListingName: 'Premium Westlands Apartments',
     type: 'New Development',
-    location: 'Off Dennis Pritt Road, Kilimani',
-    neighborhood: 'Kilimani',
+    location: 'Westlands Road, Westlands, Nairobi',
+    neighborhood: 'Westlands',
     city: 'Nairobi',
-    priceUSD: 115000,
-    bedrooms: 2,
-    bathrooms: 2,
-    areaSqFt: 1150,
-    completionYear: 'Q4 2026',
-    titleStatus: 'Sectional Title Deed (99 Yrs)',
-    developer: 'Aura Heights Developments Ltd',
+    developer: 'TBD',
+    propertyCompany: 'TBD',
+    unitTypes: [
+      { type: '1-Bedroom', size: '55 m²', price: 6000000 },
+      { type: '1-Bedroom + Study', size: '75 m²', price: 8500000 },
+      { type: '2-Bedroom Master Ensuite', size: '110 m²', price: 12000000 }
+    ],
+    currentPrice: 'KSh 6,000,000',
+    priceUSD: 46153, // Approx for calculation
+    availableUnits: 0, // TBD
+    paymentPlan: '20% deposit within 14 days, 30% after 6 months, 20% one year later, 30% upon completion',
+    expectedCompletionDate: 'December 2028',
+    indicativeROI: '11%–14%',
+    commissionRate: '3%',
+    commissionTerms: 'TBD',
+    contactDetails: 'TBD',
+    status: 'Available',
+    internalNotes: 'TBD',
+    lastUpdated: '2026-09-23',
+    completionYear: '2028',
+    bedrooms: 1,
+    bathrooms: 1,
+    areaSqFt: 592, // 55 sqm to sqft
+    titleStatus: 'Under Registration',
     isVerified: true,
     isNewDevelopment: true,
     images: [
       'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
-      'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80',
-      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'
+      'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80'
     ],
-    description: 'High-ROI off-plan investment in the heart of Kilimani with flexible 3-year diaspora payment plans. Features rooftop infinity pool, full backup generator, high-speed elevators, and children play area.',
-    amenities: ['Full Generator Backup', 'Rooftop Heated Pool', 'Borehole Water Supply', 'High-Speed Lifts', '24/7 Biometric Access', 'Gym & Fitness Center'],
-    rentalYield: '9.8% Est. ROI'
+    description: 'Discover a prime off-plan apartment investment opportunity along Westlands Road, approximately 600 metres from GTC and Sarit Centre. The development offers modern apartments designed for convenient urban living.',
+    amenities: ['GTC and Sarit Centre (600m)', 'Leading hotels and restaurants', 'Major shopping centres', 'Nairobi Expressway Access', 'Naivas & Quickmart (5 min walk)', 'Street Kitchen (2 min away)'],
+    rentalYield: '11%–14% Est. ROI',
+    parkingDetails: 'TBD',
+    serviceCharge: 'TBD',
+    informationSource: 'TBD',
+    exactProjectAddress: 'Westlands Road',
+    googleMapsLocation: 'TBD'
   },
   {
     id: 'prop-2',
-    title: 'Kileleshwa Riverside Luxury 3-Bedroom Ensuite with DSQ',
+    referenceNumber: 'DPC-002',
+    originalProjectName: 'Riverside Emerald Residency',
+    publicListingName: 'Kileleshwa Riverside Luxury 3-Bedroom Ensuite with DSQ',
     type: 'Apartment',
     location: 'Mandera Road, Kileleshwa',
     neighborhood: 'Kileleshwa',
     city: 'Nairobi',
+    developer: 'Emerald Crest Properties',
+    propertyCompany: 'Emerald Crest Properties',
+    unitTypes: [
+      { type: '3 Bedroom + DSQ', size: '1850 Sq Ft', price: 165000 }
+    ],
+    currentPrice: 165000,
     priceUSD: 165000,
+    availableUnits: 4,
+    paymentPlan: 'Cash or Mortgage (Pre-approved with KCB Diaspora)',
+    expectedCompletionDate: 'Ready for Occupation',
+    indicativeROI: '8.5%',
+    commissionRate: '3%',
+    commissionTerms: 'Paid upon full payment by client',
+    contactDetails: 'Sarah Wambui - +254 722 987 654',
+    status: 'Available',
+    internalNotes: 'Ready units. High demand for rentals.',
+    lastUpdated: '2026-09-22',
+    completionYear: 'Ready for Occupation',
     bedrooms: 3,
     bathrooms: 3.5,
     areaSqFt: 1850,
-    completionYear: 'Ready for Occupation',
     titleStatus: 'Sectional Title Deed (99 Yrs)',
-    developer: 'Emerald Crest Properties',
     isVerified: true,
     isNewDevelopment: false,
     images: [
@@ -102,18 +123,36 @@ export const mockProperties: PropertyListing[] = [
   },
   {
     id: 'prop-3',
-    title: 'The Westlands Pinnacle Studio & 1-Bedroom Executive Suites',
+    referenceNumber: 'DPC-003',
+    originalProjectName: 'Westlands Pinnacle Suites',
+    publicListingName: 'The Westlands Pinnacle Studio & 1-Bedroom Executive Suites',
     type: 'New Development',
     location: 'Westlands, Close to Sarit Centre',
     neighborhood: 'Westlands',
     city: 'Nairobi',
+    developer: 'Prime West Capital Ltd',
+    propertyCompany: 'Prime West Capital Ltd',
+    unitTypes: [
+      { type: 'Studio', size: '400 Sq Ft', price: 55000 },
+      { type: '1 Bedroom', size: '620 Sq Ft', price: 78000 }
+    ],
+    currentPrice: 78000,
     priceUSD: 78000,
+    availableUnits: 12,
+    paymentPlan: '10% Deposit, Balance over 24 months',
+    expectedCompletionDate: 'Q2 2026',
+    indicativeROI: '11.5%',
+    commissionRate: '4%',
+    commissionTerms: 'Standard',
+    contactDetails: 'Peter Kamau - +254 733 111 222',
+    status: 'Available',
+    internalNotes: 'Perfect for Airbnb. Managed services available.',
+    lastUpdated: '2026-09-21',
+    completionYear: 'Q2 2026',
     bedrooms: 1,
     bathrooms: 1,
     areaSqFt: 620,
-    completionYear: 'Q2 2026',
     titleStatus: 'Sectional Title Deed (99 Yrs)',
-    developer: 'Prime West Capital Ltd',
     isVerified: true,
     isNewDevelopment: true,
     images: [
@@ -126,18 +165,35 @@ export const mockProperties: PropertyListing[] = [
   },
   {
     id: 'prop-4',
-    title: 'Nyali Coastal Haven 3-Bedroom Ocean-Breeze Apartments',
+    referenceNumber: 'DPC-004',
+    originalProjectName: 'Swahili Nyali Heights',
+    publicListingName: 'Nyali Coastal Haven 3-Bedroom Ocean-Breeze Apartments',
     type: 'Apartment',
     location: 'Links Road, Nyali',
     neighborhood: 'Nyali',
     city: 'Mombasa',
+    developer: 'Swahili Horizon Builders',
+    propertyCompany: 'Swahili Horizon Builders',
+    unitTypes: [
+      { type: '3 Bedroom', size: '1900 Sq Ft', price: 135000 }
+    ],
+    currentPrice: 135000,
     priceUSD: 135000,
+    availableUnits: 2,
+    paymentPlan: 'Cash only',
+    expectedCompletionDate: 'Ready for Occupation',
+    indicativeROI: '9.2%',
+    commissionRate: '3%',
+    commissionTerms: 'Paid upon transfer',
+    contactDetails: 'Mombasa Office - +254 744 555 666',
+    status: 'Available',
+    internalNotes: 'Freehold title. Rare in Nyali.',
+    lastUpdated: '2026-09-19',
+    completionYear: 'Ready for Occupation',
     bedrooms: 3,
     bathrooms: 3,
     areaSqFt: 1900,
-    completionYear: 'Ready for Occupation',
     titleStatus: 'Freehold Title Deed',
-    developer: 'Swahili Horizon Builders',
     isVerified: true,
     isNewDevelopment: false,
     images: [
@@ -150,18 +206,35 @@ export const mockProperties: PropertyListing[] = [
   },
   {
     id: 'prop-5',
-    title: 'Riverside Serenade 4-Bedroom Duplex Penthouse',
+    referenceNumber: 'DPC-005',
+    originalProjectName: 'Riverside Crest Duplexes',
+    publicListingName: 'Riverside Serenade 4-Bedroom Duplex Penthouse',
     type: 'Apartment',
     location: 'Riverside Drive, Nairobi',
     neighborhood: 'Riverside',
     city: 'Nairobi',
+    developer: 'Riverside Crest Holdings',
+    propertyCompany: 'Riverside Crest Holdings',
+    unitTypes: [
+      { type: '4 Bedroom Duplex', size: '3100 Sq Ft', price: 290000 }
+    ],
+    currentPrice: 290000,
     priceUSD: 290000,
+    availableUnits: 1,
+    paymentPlan: 'Bank mortgage or cash',
+    expectedCompletionDate: 'Ready for Occupation',
+    indicativeROI: '8.0%',
+    commissionRate: '2.5%',
+    commissionTerms: 'Standard',
+    contactDetails: 'Main Sales - +254 755 000 111',
+    status: 'Available',
+    internalNotes: 'Ultra luxury. Diplomatic zone.',
+    lastUpdated: '2026-09-23',
+    completionYear: 'Ready for Occupation',
     bedrooms: 4,
     bathrooms: 4.5,
     areaSqFt: 3100,
-    completionYear: 'Ready for Occupation',
     titleStatus: 'Sectional Title Deed (99 Yrs)',
-    developer: 'Riverside Crest Holdings',
     isVerified: true,
     isNewDevelopment: false,
     images: [
@@ -174,18 +247,35 @@ export const mockProperties: PropertyListing[] = [
   },
   {
     id: 'prop-6',
-    title: 'Karen Forest View 4-Bedroom Gated Villa with Private Garden',
+    referenceNumber: 'DPC-006',
+    originalProjectName: 'Karen Forest Villas',
+    publicListingName: 'Karen Forest View 4-Bedroom Gated Villa with Private Garden',
     type: 'Villa / Townhouse',
     location: 'Mbagathi Way / Karen Enclave',
     neighborhood: 'Karen',
     city: 'Nairobi',
+    developer: 'Karen Crest Luxury Living',
+    propertyCompany: 'Karen Crest Luxury Living',
+    unitTypes: [
+      { type: '4 Bedroom Villa', size: '3800 Sq Ft', price: 360000 }
+    ],
+    currentPrice: 360000,
     priceUSD: 360000,
+    availableUnits: 1,
+    paymentPlan: 'Cash / Bank Guarantee',
+    expectedCompletionDate: 'Ready for Occupation',
+    indicativeROI: '7.5%',
+    commissionRate: '2%',
+    commissionTerms: 'Standard',
+    contactDetails: 'Karen Office - +254 766 222 333',
+    status: 'Available',
+    internalNotes: 'Last unit remaining in this phase.',
+    lastUpdated: '2026-09-24',
+    completionYear: 'Ready for Occupation',
     bedrooms: 4,
     bathrooms: 4.5,
     areaSqFt: 3800,
-    completionYear: 'Ready for Occupation',
     titleStatus: 'Freehold Title Deed',
-    developer: 'Karen Crest Luxury Living',
     isVerified: true,
     isNewDevelopment: false,
     images: [
@@ -210,11 +300,11 @@ export default function PropertyForSale() {
   const [searchQuery, setSearchQuery] = useState('');
   
   // Selected Property for View Modal
-  const [activeProperty, setActiveProperty] = useState<PropertyListing | null>(null);
+  const [activeProperty, setActiveProperty] = useState<Property | null>(null);
 
   // Site Visit Modal State
   const [isSiteVisitOpen, setIsSiteVisitOpen] = useState(false);
-  const [visitProperty, setVisitProperty] = useState<PropertyListing | null>(null);
+  const [visitProperty, setVisitProperty] = useState<Property | null>(null);
   const [visitFormSubmitted, setVisitFormSubmitted] = useState(false);
   const [visitForm, setVisitForm] = useState({
     diasporaName: '',
@@ -245,7 +335,7 @@ export default function PropertyForSale() {
       // Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        return item.title.toLowerCase().includes(q) ||
+        return item.publicListingName.toLowerCase().includes(q) ||
           item.location.toLowerCase().includes(q) ||
           item.developer.toLowerCase().includes(q) ||
           item.neighborhood.toLowerCase().includes(q);
@@ -255,7 +345,7 @@ export default function PropertyForSale() {
     });
   }, [selectedType, selectedLocation, searchQuery]);
 
-  const handleOpenSiteVisit = (prop: PropertyListing) => {
+  const handleOpenSiteVisit = (prop: Property) => {
     setVisitProperty(prop);
     setVisitFormSubmitted(false);
     setIsSiteVisitOpen(true);
@@ -414,7 +504,7 @@ export default function PropertyForSale() {
                   <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100">
                     <img 
                       src={property.images[0]} 
-                      alt={property.title}
+                      alt={property.publicListingName}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
@@ -438,7 +528,7 @@ export default function PropertyForSale() {
                       {/* Price & ROI */}
                       <div className="flex items-baseline justify-between mb-2">
                         <span className="text-2xl font-bold text-navy">
-                          {convertPrice(property.priceUSD)}
+                          {typeof property.currentPrice === 'number' ? convertPrice(property.currentPrice) : property.currentPrice}
                         </span>
                         <span className="text-xs font-bold text-dpc-blue bg-blue-50 px-2 py-0.5 rounded">
                           {property.rentalYield}
@@ -447,7 +537,7 @@ export default function PropertyForSale() {
 
                       {/* Title & Location */}
                       <h3 className="font-bold text-navy text-lg leading-snug mb-2 group-hover:text-dpc-blue transition-colors line-clamp-1">
-                        {property.title}
+                        {property.publicListingName}
                       </h3>
                       <p className="text-xs text-text-muted flex items-center gap-1 mb-4">
                         <MapPin className="w-3.5 h-3.5 text-dpc-blue shrink-0" />
@@ -592,7 +682,7 @@ export default function PropertyForSale() {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="relative aspect-[16/9] bg-neutral-900">
-              <img src={activeProperty.images[0]} alt={activeProperty.title} className="w-full h-full object-cover" />
+              <img src={activeProperty.images[0]} alt={activeProperty.publicListingName} className="w-full h-full object-cover" />
               <button 
                 onClick={() => setActiveProperty(null)}
                 className="absolute top-4 right-4 bg-black/60 hover:bg-black text-white p-2 rounded-full transition-colors"
@@ -607,46 +697,131 @@ export default function PropertyForSale() {
             <div className="p-6 md:p-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-neutral-200">
                 <div>
-                  <span className="text-xs font-bold text-dpc-blue uppercase">{activeProperty.neighborhood}, {activeProperty.city}</span>
-                  <h2 className="text-2xl font-bold text-navy mt-1">{activeProperty.title}</h2>
+                  <span className="text-xs font-bold text-dpc-blue uppercase">{activeProperty.neighborhood}, {activeProperty.city} | REF: {activeProperty.referenceNumber}</span>
+                  <h2 className="text-2xl font-bold text-navy mt-1">{activeProperty.publicListingName}</h2>
+                  {activeProperty.isNewDevelopment && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 text-[10px] font-bold uppercase mt-2 border border-amber-100">
+                      <Sparkles className="w-3 h-3" /> Prime Off-Plan Investment
+                    </span>
+                  )}
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-extrabold text-navy block">{convertPrice(activeProperty.priceUSD)}</span>
-                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">{activeProperty.rentalYield}</span>
+                  <span className="text-2xl font-extrabold text-navy block">
+                    {typeof activeProperty.currentPrice === 'number' ? convertPrice(activeProperty.currentPrice) : activeProperty.currentPrice}
+                  </span>
+                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                    {activeProperty.indicativeROI ? `${activeProperty.indicativeROI} Indicative ROI` : activeProperty.rentalYield}
+                  </span>
                 </div>
               </div>
 
-              <p className="text-sm text-text-muted leading-relaxed mb-6">{activeProperty.description}</p>
-
-              <h4 className="font-bold text-navy text-sm uppercase mb-3">Key Features & Amenities</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6">
-                {activeProperty.amenities.map((amenity, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs text-navy font-medium bg-neutral-50 p-2.5 rounded-lg border border-neutral-200">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>{amenity}</span>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                  <div>
+                    <h4 className="text-sm font-bold text-navy uppercase tracking-wider mb-2">Project Overview</h4>
+                    <p className="text-sm text-text-muted leading-relaxed">{activeProperty.description}</p>
                   </div>
-                ))}
+
+                  {activeProperty.unitTypes && activeProperty.unitTypes.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-bold text-navy uppercase tracking-wider mb-3">Available Unit Types</h4>
+                      <div className="grid grid-cols-1 gap-2">
+                        {activeProperty.unitTypes.map((unit, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl border border-neutral-200 text-sm">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-white border border-neutral-200 flex items-center justify-center text-lg">🏠</div>
+                              <div>
+                                <div className="font-bold text-navy">{unit.type}</div>
+                                <div className="text-xs text-text-muted">Size: {unit.size}</div>
+                              </div>
+                            </div>
+                            {unit.price && (
+                              <div className="font-bold text-dpc-blue">
+                                {typeof unit.price === 'number' ? convertPrice(unit.price) : unit.price}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <h4 className="text-sm font-bold text-navy uppercase tracking-wider mb-3">Prime {activeProperty.neighborhood} Location</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {activeProperty.amenities.map((amenity, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs text-navy font-medium bg-neutral-50 p-2.5 rounded-lg border border-neutral-200">
+                          <MapPin className="w-4 h-4 text-dpc-blue shrink-0" />
+                          <span>{amenity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-navy text-white rounded-2xl p-5 shadow-lg">
+                    <h4 className="text-xs font-bold uppercase tracking-wider mb-4 text-blue-200">Investment Summary</h4>
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-3">
+                        <DollarSign className="w-5 h-5 text-emerald-400 shrink-0" />
+                        <div>
+                          <div className="text-[10px] uppercase font-bold text-blue-300">Presale Price</div>
+                          <div className="text-sm font-bold">{typeof activeProperty.currentPrice === 'number' ? convertPrice(activeProperty.currentPrice) : activeProperty.currentPrice}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <BarChart className="w-5 h-5 text-dpc-yellow shrink-0" />
+                        <div>
+                          <div className="text-[10px] uppercase font-bold text-blue-300">Indicative ROI</div>
+                          <div className="text-sm font-bold">{activeProperty.indicativeROI || activeProperty.rentalYield}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <Calendar className="w-5 h-5 text-blue-400 shrink-0" />
+                        <div>
+                          <div className="text-[10px] uppercase font-bold text-blue-300">Expected Completion</div>
+                          <div className="text-sm font-bold">{activeProperty.expectedCompletionDate}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
+                    <h4 className="text-xs font-bold text-navy uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" /> Secure Payment Plan
+                    </h4>
+                    <div className="space-y-3">
+                      {activeProperty.paymentPlan.split(',').map((step, idx) => (
+                        <div key={idx} className="flex items-start gap-2 text-xs">
+                          <div className="w-5 h-5 rounded-full bg-white border border-blue-200 flex items-center justify-center shrink-0 font-bold text-dpc-blue">{idx + 1}</div>
+                          <p className="text-navy leading-tight pt-0.5">{step.trim()}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="bg-blue-50/60 border border-blue-200 rounded-2xl p-4 mb-6 text-xs text-text-muted">
-                <span className="font-bold text-navy block mb-1">Title Verification Record</span>
-                <p>This project has passed official Ministry of Lands Registry Search verification under Deed Plan No. DP-71829/NAIROBI with zero registered legal caveats.</p>
-              </div>
-
-              <div className="flex gap-4">
-                <Button 
-                  className="flex-1 bg-navy hover:bg-navy-light"
-                  onClick={() => {
-                    const prop = activeProperty;
-                    setActiveProperty(null);
-                    handleOpenSiteVisit(prop);
-                  }}
-                >
-                  <Calendar className="w-4 h-4 mr-2" /> Request Representative Site Visit
-                </Button>
-                <Button variant="outline" onClick={() => setActiveProperty(null)}>
-                  Close
-                </Button>
+              <div className="mt-8 pt-6 border-t border-neutral-200">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Button 
+                    className="flex-1 bg-navy hover:bg-navy-light h-12 text-base font-bold shadow-md"
+                    onClick={() => {
+                      const prop = activeProperty;
+                      setActiveProperty(null);
+                      handleOpenSiteVisit(prop);
+                    }}
+                  >
+                    Secure Your Apartment & Book Visit
+                  </Button>
+                  <Button variant="outline" className="h-12 px-8" onClick={() => setActiveProperty(null)}>
+                    Close
+                  </Button>
+                </div>
+                <p className="text-[10px] text-text-muted mt-4 text-center">
+                  *Prices, availability, projected returns and completion timelines are subject to change and should be independently verified.
+                </p>
               </div>
             </div>
           </div>
@@ -683,7 +858,7 @@ export default function PropertyForSale() {
                   <span className="text-xs font-bold text-dpc-blue uppercase tracking-wider block">Free Diaspora Site Inspection</span>
                   <h3 className="text-xl font-bold text-navy mt-1">Request a Site Visit</h3>
                   <p className="text-xs text-text-muted mt-1">
-                    Visiting: <strong className="text-navy">{visitProperty.title}</strong>
+                    Visiting: <strong className="text-navy">{visitProperty.publicListingName}</strong>
                   </p>
                 </div>
 

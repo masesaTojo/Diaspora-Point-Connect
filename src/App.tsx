@@ -37,6 +37,7 @@ import Content from './pages/admin/Content';
 import GiftBuilderManager from './pages/admin/GiftBuilderManager';
 import Analytics from './pages/admin/Analytics';
 import Settings from './pages/admin/Settings';
+import Properties from './pages/admin/Properties';
 
 export default function App() {
   return (
@@ -83,6 +84,7 @@ export default function App() {
           <Route path="marketing" element={<Marketing />} />
           <Route path="content" element={<Content />} />
           <Route path="gift-builder" element={<GiftBuilderManager />} />
+          <Route path="properties" element={<Properties />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="settings" element={<Settings />} />
         </Route>
