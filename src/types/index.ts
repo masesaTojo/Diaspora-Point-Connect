@@ -254,12 +254,21 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
-  customerId?: string; // Optional for guest checkout in mock
+  customerId?: string; // Authenticated purchaser UID
   customerEmail?: string;
   customerName?: string;
   customerPhone?: string;
   paymentStatus?: "PAID" | "PENDING" | "FAILED" | "REFUNDED";
-  
+  paymentMethod?: string;
+  paymentCurrency?: string;
+  paymentAmount?: number;
+  couponCode?: string;
+  pesapalTrackingId?: string;
+  pesapalMerchantReference?: string;
+  pesapalConfirmationCode?: string;
+  stockDeducted?: boolean;
+  paidAt?: string;
+
   recipientName?: string;
   recipientPhone?: string;
   
@@ -283,6 +292,22 @@ export interface Order {
   discount: number;
   total: number;
   
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentTransaction {
+  trackingId: string;
+  orderId: string;
+  customerId: string;
+  provider: "PESAPAL";
+  status: "PENDING" | "COMPLETED" | "FAILED" | "INVALID" | "REVERSED";
+  amount: number;
+  currency: string;
+  paymentMethod?: string;
+  confirmationCode?: string;
+  merchantReference: string;
+  verifiedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

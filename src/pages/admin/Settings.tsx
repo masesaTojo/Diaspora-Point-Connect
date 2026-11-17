@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { mockUsers } from '@/src/lib/mockData';
-import { Shield, Users, Activity, Lock, Search } from 'lucide-react';
+import { STAFF_ROLES } from '@/src/lib/rbac';
+import { Shield, Users, Activity, Lock, Search, CheckCircle2, LogOut } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 
 export default function Settings() {
-  const { currentUser, login, auditLogs, hasRole } = useAuth();
+  const { currentUser, effectiveRoles, emailVerified, logout, auditLogs, hasRole } = useAuth();
   const [activeTab, setActiveTab] = useState<'security' | 'roles' | 'audit'>('security');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -55,36 +55,42 @@ export default function Settings() {
 
       {activeTab === 'security' && (
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 space-y-6">
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
-            <Shield className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+            <Shield className="w-5 h-5 text-dpc-blue shrink-0 mt-0.5" />
             <div>
-              <h4 className="font-bold text-yellow-800">Security Review (Development)</h4>
-              <p className="text-sm text-yellow-700 mt-1">
-                Authentication, Authorization, and Input Validation have been conceptually applied via local contexts. In a production environment, sensitive operations and secrets must NEVER be exposed to the browser.
+              <h4 className="font-bold text-navy">Firebase Authentication & RBAC Active</h4>
+              <p className="text-sm text-text-muted mt-1">
+                Administrative routes are protected by verified Firebase Authentication and role-based route guards. Role switching via mock profiles has been disabled.
               </p>
             </div>
           </div>
 
-          <div>
-            <h4 className="font-bold text-navy mb-2">Simulate Login (Test Roles)</h4>
-            <p className="text-sm text-text-muted mb-4">Switch the current active user to test role-based access control.</p>
-            <div className="space-y-2 max-w-sm">
-              {mockUsers.map(user => (
-                <div key={user.id} className="flex items-center justify-between p-3 border border-neutral-200 rounded-lg">
-                  <div>
-                    <div className="font-medium text-navy">{user.firstName} {user.lastName}</div>
-                    <div className="text-xs text-text-muted">{user.roles.join(", ")}</div>
-                  </div>
-                  <Button 
-                    size="sm" 
-                    variant={currentUser?.id === user.id ? "default" : "outline"}
-                    onClick={() => login(user.email)}
-                    disabled={currentUser?.id === user.id}
-                  >
-                    {currentUser?.id === user.id ? 'Active' : 'Login'}
-                  </Button>
-                </div>
-              ))}
+          <div className="p-5 border border-neutral-200 rounded-xl bg-neutral-50/70 space-y-3">
+            <h4 className="font-bold text-navy">Active Administrator Session</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="text-xs font-semibold text-text-muted block">Email</span>
+                <span className="font-medium text-navy">{currentUser?.email}</span>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-text-muted block">Effective Roles</span>
+                <span className="font-semibold text-dpc-blue">{effectiveRoles.join(', ')}</span>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-text-muted block">Email Verification</span>
+                <span className="inline-flex items-center gap-1 font-medium text-emerald-700">
+                  <CheckCircle2 className="w-4 h-4" /> {emailVerified ? 'Verified via Google OAuth' : 'Unverified'}
+                </span>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-text-muted block">User ID</span>
+                <span className="font-mono text-xs text-text-muted">{currentUser?.id}</span>
+              </div>
+            </div>
+            <div className="pt-2">
+              <Button variant="outline" size="sm" onClick={logout} className="text-red-600 border-red-200 hover:bg-red-50 gap-1.5">
+                <LogOut className="w-4 h-4" /> Sign Out & Switch Account
+              </Button>
             </div>
           </div>
         </div>
@@ -146,14 +152,16 @@ export default function Settings() {
       {activeTab === 'roles' && (
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6">
            <h3 className="font-bold text-navy mb-4">Role System Config</h3>
-           <div className="space-y-4">
-             {["SUPER_ADMIN", "STORE_MANAGER", "FINANCE_MANAGER", "DELIVERY_MANAGER"].map(role => (
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             {STAFF_ROLES.map(role => (
                <div key={role} className="p-4 border border-neutral-200 rounded-lg">
                  <h4 className="font-bold text-navy">{role}</h4>
                  <div className="flex gap-2 mt-2">
                    <span className="px-2 py-1 bg-green-50 text-green-700 text-xs rounded">VIEW</span>
-                   {role !== "DELIVERY_MANAGER" && <span className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded">EDIT</span>}
-                   {role === "SUPER_ADMIN" && <span className="px-2 py-1 bg-red-50 text-red-700 text-xs rounded">DELETE</span>}
+                   {role !== "SUPPORT_AGENT" && role !== "DELIVERY_MANAGER" && (
+                     <span className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded">EDIT</span>
+                   )}
+                   {role === "SUPER_ADMIN" && <span className="px-2 py-1 bg-red-50 text-red-700 text-xs rounded">ADMIN / MIGRATION</span>}
                  </div>
                </div>
              ))}

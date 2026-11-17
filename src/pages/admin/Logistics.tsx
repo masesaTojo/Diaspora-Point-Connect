@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { DeliveryZone, Driver } from '@/src/types';
-import { 
-  getStoredDeliveryZones, 
-  saveStoredDeliveryZones, 
-  getStoredDrivers, 
-  saveStoredDrivers 
-} from '@/src/lib/adminStorage';
-import { Truck, Map, Clock, Plus, UserCheck, AlertTriangle, X, Check, Edit, Trash2, Phone, ShieldCheck } from 'lucide-react';
+import { useShop } from '@/src/contexts/ShopContext';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { db } from '@/src/lib/firebase';
+import { collection, deleteDoc, doc, onSnapshot, orderBy, query, setDoc } from 'firebase/firestore';
+import { buildFirestoreErrorInfo, OperationType, stripUndefined } from '@/src/lib/firestoreErrors';
+import { Truck, Map, Clock, Plus, X, Check, Edit, Trash2, Phone, ShieldCheck } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 
 export default function Logistics() {
+  const { deliveryZones: zones } = useShop();
+  const { currentUser, logAction } = useAuth();
   const [activeTab, setActiveTab] = useState<'zones' | 'drivers'>('zones');
-  const [zones, setZones] = useState<DeliveryZone[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Modals
   const [isZoneModalOpen, setIsZoneModalOpen] = useState(false);
@@ -42,9 +43,18 @@ export default function Logistics() {
   });
 
   useEffect(() => {
-    setZones(getStoredDeliveryZones());
-    setDrivers(getStoredDrivers());
-  }, []);
+    if (!currentUser) return;
+    const unsub = onSnapshot(
+      query(collection(db, 'drivers'), orderBy('name')),
+      (snap) => {
+        setDrivers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Driver)));
+      },
+      (err) => {
+        console.error('Drivers listener error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.LIST, 'drivers')));
+      }
+    );
+    return () => unsub();
+  }, [currentUser]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -70,63 +80,65 @@ export default function Logistics() {
     setZoneForm({
       name: zone.name,
       fee: zone.fee,
-      estimatedTime: zone.estimatedTime,
-      minimumOrder: zone.minimumOrder,
-      sameDayAvailable: zone.sameDayAvailable,
-      scheduledAvailable: zone.scheduledAvailable,
-      postalCodes: zone.postalCodes.join(', ')
+      estimatedTime: zone.estimatedTime || '',
+      minimumOrder: zone.minimumOrder ?? 0,
+      sameDayAvailable: Boolean(zone.sameDayAvailable),
+      scheduledAvailable: Boolean(zone.scheduledAvailable),
+      postalCodes: (zone.postalCodes || []).join(', ')
     });
     setIsZoneModalOpen(true);
   };
 
-  const handleSaveZone = (e: React.FormEvent) => {
+  const handleSaveZone = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!zoneForm.name.trim()) return;
+    if (!zoneForm.name.trim() || saving) return;
 
-    if (editingZone) {
-      const updated = zones.map(z => {
-        if (z.id === editingZone.id) {
-          return {
-            ...z,
-            name: zoneForm.name,
-            fee: Number(zoneForm.fee),
-            estimatedTime: zoneForm.estimatedTime,
-            minimumOrder: Number(zoneForm.minimumOrder),
-            sameDayAvailable: zoneForm.sameDayAvailable,
-            scheduledAvailable: zoneForm.scheduledAvailable,
-            postalCodes: zoneForm.postalCodes.split(',').map(s => s.trim()).filter(Boolean)
-          };
-        }
-        return z;
-      });
-      setZones(updated);
-      saveStoredDeliveryZones(updated);
-      showToast(`Updated delivery zone "${zoneForm.name}".`);
-    } else {
-      const newZone: DeliveryZone = {
-        id: `zone-${Date.now()}`,
-        name: zoneForm.name,
+    setSaving(true);
+    try {
+      const zoneId = editingZone ? editingZone.id : `zone-${Date.now()}`;
+      const postalList = zoneForm.postalCodes.split(',').map(s => s.trim()).filter(Boolean);
+      const payload: DeliveryZone = stripUndefined({
+        id: zoneId,
+        name: zoneForm.name.trim(),
         fee: Number(zoneForm.fee),
-        estimatedTime: zoneForm.estimatedTime,
+        estimatedTime: zoneForm.estimatedTime.trim(),
         minimumOrder: Number(zoneForm.minimumOrder),
         sameDayAvailable: zoneForm.sameDayAvailable,
         scheduledAvailable: zoneForm.scheduledAvailable,
-        postalCodes: zoneForm.postalCodes.split(',').map(s => s.trim()).filter(Boolean)
-      };
-      const updated = [...zones, newZone];
-      setZones(updated);
-      saveStoredDeliveryZones(updated);
-      showToast(`Added delivery zone "${newZone.name}".`);
-    }
+        ...(postalList.length > 0 ? { postalCodes: postalList } : {}),
+      });
 
-    setIsZoneModalOpen(false);
+      await setDoc(doc(db, 'deliveryZones', zoneId), payload);
+      await logAction(
+        editingZone ? 'UPDATE' : 'CREATE',
+        'DeliveryZone',
+        zoneId,
+        editingZone?.name,
+        payload.name
+      );
+      showToast(editingZone ? `Updated delivery zone "${payload.name}".` : `Added delivery zone "${payload.name}".`);
+      setIsZoneModalOpen(false);
+    } catch (err) {
+      console.error('Delivery zone save error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.WRITE, 'deliveryZones')));
+      showToast('Failed to save delivery zone in Firestore.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDeleteZone = (zoneId: string) => {
-    const updated = zones.filter(z => z.id !== zoneId);
-    setZones(updated);
-    saveStoredDeliveryZones(updated);
-    showToast('Delivery zone removed.');
+  const handleDeleteZone = async (zoneId: string) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await deleteDoc(doc(db, 'deliveryZones', zoneId));
+      await logAction('DELETE', 'DeliveryZone', zoneId);
+      showToast('Delivery zone removed.');
+    } catch (err) {
+      console.error('Delivery zone delete error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.DELETE, `deliveryZones/${zoneId}`)));
+      showToast('Failed to remove delivery zone.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleOpenAddDriver = () => {
@@ -145,55 +157,60 @@ export default function Logistics() {
     setDriverForm({
       name: driver.name,
       phone: driver.phone,
-      currentZoneId: driver.currentZoneId,
+      currentZoneId: driver.currentZoneId || '',
       status: driver.status
     });
     setIsDriverModalOpen(true);
   };
 
-  const handleSaveDriver = (e: React.FormEvent) => {
+  const handleSaveDriver = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!driverForm.name.trim()) return;
+    if (!driverForm.name.trim() || saving) return;
 
-    if (editingDriver) {
-      const updated = drivers.map(d => {
-        if (d.id === editingDriver.id) {
-          return {
-            ...d,
-            name: driverForm.name,
-            phone: driverForm.phone,
-            currentZoneId: driverForm.currentZoneId,
-            status: driverForm.status
-          };
-        }
-        return d;
+    setSaving(true);
+    try {
+      const driverId = editingDriver ? editingDriver.id : `drv-${Date.now()}`;
+      const assignedZoneId = driverForm.currentZoneId || zones[0]?.id;
+      const payload: Driver = stripUndefined({
+        id: driverId,
+        name: driverForm.name.trim(),
+        phone: driverForm.phone.trim(),
+        status: driverForm.status,
+        ...(assignedZoneId ? { currentZoneId: assignedZoneId } : {}),
       });
-      setDrivers(updated);
-      saveStoredDrivers(updated);
-      showToast(`Updated driver details for ${driverForm.name}.`);
-    } else {
-      const newDriver: Driver = {
-        id: `drv-${Date.now()}`,
-        name: driverForm.name,
-        phone: driverForm.phone,
-        currentZoneId: driverForm.currentZoneId || zones[0]?.id || 'zone-1',
-        status: driverForm.status
-      };
-      const updated = [...drivers, newDriver];
-      setDrivers(updated);
-      saveStoredDrivers(updated);
-      showToast(`Added driver ${newDriver.name} to fleet.`);
-    }
 
-    setIsDriverModalOpen(false);
+      await setDoc(doc(db, 'drivers', driverId), payload);
+      await logAction(
+        editingDriver ? 'UPDATE' : 'CREATE',
+        'Driver',
+        driverId,
+        editingDriver?.name,
+        payload.name
+      );
+      showToast(editingDriver ? `Updated driver details for ${payload.name}.` : `Added driver ${payload.name} to fleet.`);
+      setIsDriverModalOpen(false);
+    } catch (err) {
+      console.error('Driver save error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.WRITE, 'drivers')));
+      showToast('Failed to save driver in Firestore.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDeleteDriver = (driverId: string) => {
-    const updated = drivers.filter(d => d.id !== driverId);
-    setDrivers(updated);
-    saveStoredDrivers(updated);
-    showToast('Driver removed from fleet.');
-    setIsDriverModalOpen(false);
+  const handleDeleteDriver = async (driverId: string) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await deleteDoc(doc(db, 'drivers', driverId));
+      await logAction('DELETE', 'Driver', driverId);
+      showToast('Driver removed from fleet.');
+      setIsDriverModalOpen(false);
+    } catch (err) {
+      console.error('Driver delete error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.DELETE, `drivers/${driverId}`)));
+      showToast('Failed to remove driver from Firestore.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -267,7 +284,7 @@ export default function Logistics() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-text-muted">Min. Order</span>
-                    <span className="font-medium text-navy">${zone.minimumOrder.toFixed(2)}</span>
+                    <span className="font-medium text-navy">${(zone.minimumOrder ?? 0).toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-text-muted">Same Day Delivery</span>
@@ -283,7 +300,7 @@ export default function Logistics() {
                   </div>
                   <div className="pt-2 text-xs text-text-muted">
                     <span className="font-semibold text-navy">Postal / Area codes: </span>
-                    {zone.postalCodes.join(', ')}
+                    {(zone.postalCodes || []).join(', ') || 'All city zones'}
                   </div>
                 </div>
               </div>
@@ -325,49 +342,57 @@ export default function Logistics() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {drivers.map(driver => {
-                const zone = zones.find(z => z.id === driver.currentZoneId);
-                return (
-                  <tr key={driver.id} className="hover:bg-neutral-50">
-                    <td className="px-6 py-4 font-bold text-navy flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-blue-100 text-dpc-blue flex items-center justify-center font-bold text-xs">
-                        {driver.name.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      <div>
-                        <div>{driver.name}</div>
-                        <div className="text-xs font-normal text-text-muted flex items-center gap-1">
-                          <ShieldCheck className="w-3 h-3 text-emerald-600" /> Verified Courier
+              {drivers.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-text-muted">
+                    No fleet drivers registered yet. Add a driver to enable dispatch assignment.
+                  </td>
+                </tr>
+              ) : (
+                drivers.map(driver => {
+                  const zone = zones.find(z => z.id === driver.currentZoneId);
+                  return (
+                    <tr key={driver.id} className="hover:bg-neutral-50">
+                      <td className="px-6 py-4 font-bold text-navy flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-blue-100 text-dpc-blue flex items-center justify-center font-bold text-xs">
+                          {driver.name.split(' ').map(n => n[0]).join('')}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-text-muted font-mono text-xs">
-                      <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {driver.phone}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {driver.status === 'AVAILABLE' && <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Available</span>}
-                      {driver.status === 'ON_DELIVERY' && <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">On Delivery</span>}
-                      {driver.status === 'OFF_DUTY' && <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-neutral-100 text-neutral-600">Off Duty</span>}
-                    </td>
-                    <td className="px-6 py-4 text-text-muted">
-                      {zone ? (
-                        <span className="inline-flex items-center gap-1 text-navy font-medium">
-                          <Map className="w-3.5 h-3.5 text-dpc-blue" /> {zone.name}
-                        </span>
-                      ) : 'Unassigned'}
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleOpenEditDriver(driver)}
-                        className="text-dpc-blue hover:bg-blue-50 text-xs font-semibold"
-                      >
-                        Manage
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
+                        <div>
+                          <div>{driver.name}</div>
+                          <div className="text-xs font-normal text-text-muted flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3 text-emerald-600" /> Verified Courier
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-text-muted font-mono text-xs">
+                        <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {driver.phone}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {driver.status === 'AVAILABLE' && <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Available</span>}
+                        {driver.status === 'ON_DELIVERY' && <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">On Delivery</span>}
+                        {driver.status === 'OFF_DUTY' && <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-neutral-100 text-neutral-600">Off Duty</span>}
+                      </td>
+                      <td className="px-6 py-4 text-text-muted">
+                        {zone ? (
+                          <span className="inline-flex items-center gap-1 text-navy font-medium">
+                            <Map className="w-3.5 h-3.5 text-dpc-blue" /> {zone.name}
+                          </span>
+                        ) : 'Unassigned'}
+                      </td>
+                      <td className="px-6 py-4 text-right space-x-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleOpenEditDriver(driver)}
+                          className="text-dpc-blue hover:bg-blue-50 text-xs font-semibold"
+                        >
+                          Manage
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -475,8 +500,8 @@ export default function Logistics() {
                 <Button type="button" variant="outline" onClick={() => setIsZoneModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
-                  {editingZone ? 'Save Zone' : 'Create Zone'}
+                <Button type="submit" disabled={saving} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
+                  {saving ? 'Saving...' : editingZone ? 'Save Zone' : 'Create Zone'}
                 </Button>
               </div>
             </form>
@@ -553,6 +578,7 @@ export default function Logistics() {
                 {editingDriver ? (
                   <button 
                     type="button" 
+                    disabled={saving}
                     onClick={() => handleDeleteDriver(editingDriver.id)}
                     className="text-xs text-red-600 hover:underline flex items-center gap-1 font-semibold"
                   >
@@ -564,8 +590,8 @@ export default function Logistics() {
                   <Button type="button" variant="outline" onClick={() => setIsDriverModalOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
-                    {editingDriver ? 'Save Changes' : 'Add to Fleet'}
+                  <Button type="submit" disabled={saving} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
+                    {saving ? 'Saving...' : editingDriver ? 'Save Changes' : 'Add to Fleet'}
                   </Button>
                 </div>
               </div>
@@ -577,4 +603,3 @@ export default function Logistics() {
     </div>
   );
 }
-

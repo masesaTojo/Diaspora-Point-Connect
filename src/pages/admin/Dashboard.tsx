@@ -1,22 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/src/components/ui/Card';
 import { Order } from '@/src/types';
-import { getStoredOrders, getStoredProducts } from '@/src/lib/adminStorage';
-import { Package, ShoppingBag, Users, Truck, ArrowRight, PlusCircle, ArrowUpRight, Box, Megaphone, ShieldCheck } from 'lucide-react';
+import { useShop } from '@/src/contexts/ShopContext';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { auth } from '@/src/lib/firebase';
+import { ADMIN_ROUTE_ROLES } from '@/src/lib/rbac';
+import { Package, ShoppingBag, Users, Truck, ArrowRight, PlusCircle, ArrowUpRight, Box, Megaphone, ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { products } = useShop();
+  const { currentUser, hasRole } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [productsCount, setProductsCount] = useState<number>(0);
-  
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+
+  const canViewOrders = hasRole(ADMIN_ROUTE_ROLES.sales);
+
+  const loadOrders = useCallback(async () => {
+    if (!canViewOrders || !auth.currentUser) {
+      setLoadingOrders(false);
+      return;
+    }
+    setLoadingOrders(true);
+    setOrdersError(null);
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/admin/orders', {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || `Failed to load orders (${res.status})`);
+      }
+      setOrders(Array.isArray(data.orders) ? data.orders : []);
+    } catch (err) {
+      setOrdersError((err as Error)?.message || 'Unable to load dashboard orders.');
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, [canViewOrders]);
+
   useEffect(() => {
-    const loadedOrders = getStoredOrders();
-    setOrders(loadedOrders);
-    const loadedProducts = getStoredProducts();
-    setProductsCount(loadedProducts.length);
-  }, []);
+    if (currentUser) {
+      loadOrders();
+    }
+  }, [currentUser, loadOrders]);
+
+  const productsCount = products.filter(p => p.status !== 'ARCHIVED').length;
 
   const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
   
@@ -24,7 +57,7 @@ export default function Dashboard() {
   const uniqueCustomers = new Set(orders.map(o => o.customerEmail).filter(Boolean)).size;
 
   const pendingDeliveries = orders.filter(o => 
-    ['NEW', 'CONFIRMED', 'PROCESSING', 'DISPATCHED', 'READY_FOR_DELIVERY', 'OUT_FOR_DELIVERY'].includes(o.status || '')
+    ['NEW', 'PAYMENT_PENDING', 'PAYMENT_CONFIRMED', 'CONFIRMED', 'PROCESSING', 'DISPATCHED', 'READY_FOR_DELIVERY', 'OUT_FOR_DELIVERY'].includes(o.status || '')
   ).length;
 
   const recentOrders = [...orders].sort((a, b) => 
@@ -38,7 +71,8 @@ export default function Dashboard() {
       case 'OUT_FOR_DELIVERY': return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'READY_FOR_DELIVERY': return 'bg-amber-100 text-amber-800 border-amber-200';
       case 'PROCESSING': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'CANCELLED': return 'bg-red-100 text-red-800 border-red-200';
+      case 'CANCELLED':
+      case 'PAYMENT_FAILED': return 'bg-red-100 text-red-800 border-red-200';
       default: return 'bg-neutral-100 text-neutral-800 border-neutral-200';
     }
   };
@@ -166,6 +200,13 @@ export default function Dashboard() {
         </Link>
       </div>
 
+      {ordersError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-center gap-3 text-sm">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+          <span>{ordersError}</span>
+        </div>
+      )}
+
       {/* Recent Orders Card */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -173,9 +214,16 @@ export default function Dashboard() {
             <CardTitle className="text-lg">Recent Diaspora Orders</CardTitle>
             <p className="text-xs text-text-muted mt-0.5">Click any order row to view details or manage status in Sales</p>
           </div>
-          <Link to="/admin/sales" className="text-xs font-bold text-dpc-blue hover:underline flex items-center gap-1">
-            View All Orders <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+          <div className="flex items-center gap-3">
+            {canViewOrders && (
+              <Button variant="outline" size="sm" onClick={loadOrders} disabled={loadingOrders} className="border-neutral-300">
+                <RefreshCw className={`w-3.5 h-3.5 mr-1 ${loadingOrders ? 'animate-spin' : ''}`} /> Refresh
+              </Button>
+            )}
+            <Link to="/admin/sales" className="text-xs font-bold text-dpc-blue hover:underline flex items-center gap-1">
+              View All Orders <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -191,7 +239,19 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
-                {recentOrders.length === 0 ? (
+                {loadingOrders ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center text-text-muted">
+                      Loading live diaspora orders...
+                    </td>
+                  </tr>
+                ) : !canViewOrders ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center text-text-muted">
+                      Order list requires Sales &amp; Order Management permissions.
+                    </td>
+                  </tr>
+                ) : recentOrders.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-8 text-center text-text-muted">
                       No orders placed yet.

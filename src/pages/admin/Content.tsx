@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { CmsSection } from '@/src/types';
-import { getStoredCmsSections, saveStoredCmsSections } from '@/src/lib/adminStorage';
-import { GripVertical, Eye, EyeOff, Edit, MoveUp, MoveDown, Plus, Check, X, LayoutTemplate } from 'lucide-react';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { db } from '@/src/lib/firebase';
+import { collection, doc, onSnapshot, orderBy, query, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { buildFirestoreErrorInfo, OperationType, stripUndefined } from '@/src/lib/firestoreErrors';
+import { Eye, EyeOff, Edit, MoveUp, MoveDown, Plus, Check, X, LayoutTemplate } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 
 export default function Content() {
+  const { currentUser, logAction } = useAuth();
   const [sections, setSections] = useState<CmsSection[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Edit/Add modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -18,25 +23,74 @@ export default function Content() {
   });
 
   useEffect(() => {
-    const loaded = getStoredCmsSections().sort((a, b) => a.order - b.order);
-    setSections(loaded);
-  }, []);
+    if (!currentUser) return;
+    const unsub = onSnapshot(
+      query(collection(db, 'cmsSections'), orderBy('order')),
+      (snap) => {
+        setSections(snap.docs.map((d) => ({ id: d.id, ...d.data() } as CmsSection)));
+      },
+      (err) => {
+        console.error('CMS listener error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.LIST, 'cmsSections')));
+      }
+    );
+    return () => unsub();
+  }, [currentUser]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleSaveAll = () => {
-    saveStoredCmsSections(sections);
-    showToast('Homepage CMS layout saved successfully.');
+  const handleSaveAll = async () => {
+    if (saving || sections.length === 0) return;
+    setSaving(true);
+    try {
+      const batch = writeBatch(db);
+      sections.forEach((sec, idx) => {
+        batch.set(
+          doc(db, 'cmsSections', sec.id),
+          stripUndefined({
+            ...sec,
+            order: idx + 1,
+          })
+        );
+      });
+      await batch.commit();
+      await logAction('UPDATE', 'CmsSection', 'layout', undefined, `Saved ${sections.length} sections`);
+      showToast('Homepage CMS layout saved to Firestore.');
+    } catch (err) {
+      console.error('CMS save layout error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.WRITE, 'cmsSections')));
+      showToast('Failed to save CMS layout.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const toggleVisibility = (id: string) => {
-    const updated = sections.map(s => s.id === id ? { ...s, isVisible: !s.isVisible } : s);
-    setSections(updated);
-    saveStoredCmsSections(updated);
-    showToast('Section visibility updated.');
+  const toggleVisibility = async (section: CmsSection) => {
+    const nextVisible = !section.isVisible;
+    try {
+      await updateDoc(doc(db, 'cmsSections', section.id), { isVisible: nextVisible });
+      await logAction('UPDATE', 'CmsSection', section.id, String(section.isVisible), String(nextVisible));
+      showToast('Section visibility updated.');
+    } catch (err) {
+      console.error('CMS visibility error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.UPDATE, `cmsSections/${section.id}`)));
+      showToast('Failed to toggle section visibility.');
+    }
+  };
+
+  const commitReorder = async (reordered: CmsSection[]) => {
+    setSections(reordered);
+    try {
+      const batch = writeBatch(db);
+      reordered.forEach((s) => {
+        batch.update(doc(db, 'cmsSections', s.id), { order: s.order });
+      });
+      await batch.commit();
+      await logAction('REORDER', 'CmsSection', 'layout');
+    } catch (err) {
+      console.error('CMS reorder error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.UPDATE, 'cmsSections')));
+      showToast('Failed to save section order.');
+    }
   };
 
   const moveUp = (index: number) => {
@@ -45,11 +99,8 @@ export default function Content() {
     const temp = newSections[index];
     newSections[index] = newSections[index - 1];
     newSections[index - 1] = temp;
-    
-    // Re-index orders
     const reordered = newSections.map((s, idx) => ({ ...s, order: idx + 1 }));
-    setSections(reordered);
-    saveStoredCmsSections(reordered);
+    commitReorder(reordered);
   };
 
   const moveDown = (index: number) => {
@@ -58,11 +109,8 @@ export default function Content() {
     const temp = newSections[index];
     newSections[index] = newSections[index + 1];
     newSections[index + 1] = temp;
-    
-    // Re-index orders
     const reordered = newSections.map((s, idx) => ({ ...s, order: idx + 1 }));
-    setSections(reordered);
-    saveStoredCmsSections(reordered);
+    commitReorder(reordered);
   };
 
   const handleOpenAdd = () => {
@@ -78,48 +126,51 @@ export default function Content() {
   const handleOpenEdit = (section: CmsSection) => {
     setEditingSection(section);
     setFormData({
-      title: section.title,
+      title: section.title || '',
       type: section.type,
       isVisible: section.isVisible
     });
     setIsModalOpen(true);
   };
 
-  const handleSaveModal = (e: React.FormEvent) => {
+  const handleSaveModal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title.trim()) return;
+    if (!formData.title.trim() || saving) return;
 
-    if (editingSection) {
-      const updated = sections.map(s => {
-        if (s.id === editingSection.id) {
-          return {
-            ...s,
-            title: formData.title,
-            type: formData.type,
-            isVisible: formData.isVisible
-          };
-        }
-        return s;
-      });
-      setSections(updated);
-      saveStoredCmsSections(updated);
-      showToast(`Updated section "${formData.title}".`);
-    } else {
-      const newSection: CmsSection = {
-        id: `sec-${Date.now()}`,
-        title: formData.title,
-        type: formData.type,
-        order: sections.length + 1,
-        isVisible: formData.isVisible,
-        items: []
-      };
-      const updated = [...sections, newSection];
-      setSections(updated);
-      saveStoredCmsSections(updated);
-      showToast(`Created new homepage section "${newSection.title}".`);
+    setSaving(true);
+    try {
+      if (editingSection) {
+        const updatedPayload: CmsSection = stripUndefined({
+          ...editingSection,
+          title: formData.title.trim(),
+          type: formData.type,
+          isVisible: formData.isVisible,
+        });
+        await setDoc(doc(db, 'cmsSections', editingSection.id), updatedPayload);
+        await logAction('UPDATE', 'CmsSection', editingSection.id, editingSection.title, updatedPayload.title);
+        showToast(`Updated section "${updatedPayload.title}".`);
+      } else {
+        const secId = `sec-${Date.now()}`;
+        const newSection: CmsSection = stripUndefined({
+          id: secId,
+          title: formData.title.trim(),
+          type: formData.type,
+          order: sections.length + 1,
+          isVisible: formData.isVisible,
+          items: []
+        });
+        await setDoc(doc(db, 'cmsSections', secId), newSection);
+        await logAction('CREATE', 'CmsSection', secId, undefined, newSection.title);
+        showToast(`Created new homepage section "${newSection.title}".`);
+      }
+
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error('CMS section save error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.WRITE, 'cmsSections')));
+      showToast('Failed to save CMS section.');
+    } finally {
+      setSaving(false);
     }
-
-    setIsModalOpen(false);
   };
 
   return (
@@ -141,8 +192,8 @@ export default function Content() {
           <Button variant="outline" onClick={handleOpenAdd} className="flex items-center gap-2">
             <Plus className="h-4 w-4" /> Add Section
           </Button>
-          <Button onClick={handleSaveAll} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
-            Save Layout
+          <Button onClick={handleSaveAll} disabled={saving} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
+            {saving ? 'Saving...' : 'Save Layout'}
           </Button>
         </div>
       </div>
@@ -156,74 +207,80 @@ export default function Content() {
         </div>
 
         <div className="space-y-2">
-          {sections.map((section, idx) => (
-            <div 
-              key={section.id} 
-              className={`flex items-center justify-between p-3.5 border rounded-xl transition-all ${
-                section.isVisible ? 'bg-white border-neutral-200 shadow-xs' : 'bg-neutral-50 border-neutral-200/60 opacity-60'
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex items-center justify-center w-6 h-6 rounded bg-neutral-100 font-mono text-xs font-bold text-text-muted">
-                  {idx + 1}
-                </div>
-                <div>
-                  <span className="font-bold text-navy block text-sm">{section.title}</span>
-                  <span className="text-xs font-mono text-text-muted uppercase tracking-wider">{section.type.replace('_', ' ')}</span>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-1.5">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => moveUp(idx)} 
-                  disabled={idx === 0}
-                  className="h-8 w-8 p-0 text-text-muted hover:text-navy disabled:opacity-30"
-                  title="Move Up"
-                >
-                  <MoveUp className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => moveDown(idx)} 
-                  disabled={idx === sections.length - 1}
-                  className="h-8 w-8 p-0 text-text-muted hover:text-navy disabled:opacity-30"
-                  title="Move Down"
-                >
-                  <MoveDown className="h-4 w-4" />
-                </Button>
-                <div className="w-px h-5 bg-neutral-200 mx-1"></div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => toggleVisibility(section.id)}
-                  className="h-8 px-2 text-xs"
-                  title={section.isVisible ? 'Hide Section' : 'Show Section'}
-                >
-                  {section.isVisible ? (
-                    <span className="flex items-center gap-1 text-emerald-700 font-medium">
-                      <Eye className="h-4 w-4" /> Visible
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-text-muted">
-                      <EyeOff className="h-4 w-4" /> Hidden
-                    </span>
-                  )}
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => handleOpenEdit(section)}
-                  className="text-dpc-blue hover:bg-blue-50 h-8 w-8 p-0"
-                  title="Edit Section Details"
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-              </div>
+          {sections.length === 0 ? (
+            <div className="text-center py-8 text-sm text-text-muted">
+              No CMS sections configured in Firestore yet. Add a section or initialize via Database Setup.
             </div>
-          ))}
+          ) : (
+            sections.map((section, idx) => (
+              <div 
+                key={section.id} 
+                className={`flex items-center justify-between p-3.5 border rounded-xl transition-all ${
+                  section.isVisible ? 'bg-white border-neutral-200 shadow-xs' : 'bg-neutral-50 border-neutral-200/60 opacity-60'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-neutral-100 font-mono text-xs font-bold text-text-muted">
+                    {idx + 1}
+                  </div>
+                  <div>
+                    <span className="font-bold text-navy block text-sm">{section.title || section.type}</span>
+                    <span className="text-xs font-mono text-text-muted uppercase tracking-wider">{section.type.replace(/_/g, ' ')}</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-1.5">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => moveUp(idx)} 
+                    disabled={idx === 0}
+                    className="h-8 w-8 p-0 text-text-muted hover:text-navy disabled:opacity-30"
+                    title="Move Up"
+                  >
+                    <MoveUp className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => moveDown(idx)} 
+                    disabled={idx === sections.length - 1}
+                    className="h-8 w-8 p-0 text-text-muted hover:text-navy disabled:opacity-30"
+                    title="Move Down"
+                  >
+                    <MoveDown className="h-4 w-4" />
+                  </Button>
+                  <div className="w-px h-5 bg-neutral-200 mx-1"></div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => toggleVisibility(section)}
+                    className="h-8 px-2 text-xs"
+                    title={section.isVisible ? 'Hide Section' : 'Show Section'}
+                  >
+                    {section.isVisible ? (
+                      <span className="flex items-center gap-1 text-emerald-700 font-medium">
+                        <Eye className="h-4 w-4" /> Visible
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-text-muted">
+                        <EyeOff className="h-4 w-4" /> Hidden
+                      </span>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleOpenEdit(section)}
+                    className="text-dpc-blue hover:bg-blue-50 h-8 w-8 p-0"
+                    title="Edit Section Details"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -284,8 +341,8 @@ export default function Content() {
                 <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
-                  {editingSection ? 'Save Changes' : 'Create Section'}
+                <Button type="submit" disabled={saving} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
+                  {saving ? 'Saving...' : editingSection ? 'Save Changes' : 'Create Section'}
                 </Button>
               </div>
             </form>
@@ -296,4 +353,3 @@ export default function Content() {
     </div>
   );
 }
-

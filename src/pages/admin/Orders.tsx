@@ -1,64 +1,133 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Order, OrderStatus, Driver } from '@/src/types';
-import { Search, Filter, MoreVertical, Eye, Truck, Check, X, MapPin, Package, Download, MessageSquare } from 'lucide-react';
+import { Driver, Order, OrderStatus } from '@/src/types';
+import { Search, Eye, Truck, Check, X, Package, Download, MessageSquare, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
-import { mockDrivers } from '@/src/lib/mockData';
-import { getStoredOrders, saveStoredOrders } from '@/src/lib/adminStorage';
+import { auth, db } from '@/src/lib/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { buildFirestoreErrorInfo, OperationType } from '@/src/lib/firestoreErrors';
+import { useAuth } from '@/src/contexts/AuthContext';
 
 const STATUS_COLORS: Record<string, string> = {
   NEW: 'bg-blue-100 text-blue-800',
+  PAYMENT_PENDING: 'bg-amber-100 text-amber-800',
+  PAYMENT_CONFIRMED: 'bg-emerald-100 text-emerald-800',
   CONFIRMED: 'bg-indigo-100 text-indigo-800',
   PROCESSING: 'bg-yellow-100 text-yellow-800',
   READY_FOR_DELIVERY: 'bg-orange-100 text-orange-800',
   DISPATCHED: 'bg-orange-200 text-orange-900',
   OUT_FOR_DELIVERY: 'bg-purple-100 text-purple-800',
   DELIVERED: 'bg-green-100 text-green-800',
+  PAYMENT_FAILED: 'bg-red-100 text-red-800',
+  STOCK_ISSUE: 'bg-rose-100 text-rose-800',
   CANCELLED: 'bg-red-100 text-red-800',
   REFUNDED: 'bg-gray-100 text-gray-800',
 };
 
 const ALL_STATUSES: OrderStatus[] = [
-  "NEW", "CONFIRMED", "PROCESSING", "READY_FOR_DELIVERY", 
-  "DISPATCHED", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED", "REFUNDED"
+  "NEW", "PAYMENT_PENDING", "CONFIRMED", "PROCESSING", "READY_FOR_DELIVERY",
+  "DISPATCHED", "OUT_FOR_DELIVERY", "DELIVERED", "PAYMENT_FAILED", "STOCK_ISSUE", "CANCELLED", "REFUNDED"
 ];
 
 export default function Orders() {
   const [searchParams] = useSearchParams();
+  const { currentUser } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
 
-  // Load orders from durable storage
   useEffect(() => {
-    const loadedOrders = getStoredOrders();
-    setOrders(loadedOrders);
-
-    // If order param is provided in URL, pre-select it
-    const orderIdParam = searchParams.get('order');
-    if (orderIdParam) {
-      const matched = loadedOrders.find(o => o.id === orderIdParam);
-      if (matched) {
-        setSelectedOrder(matched);
+    if (!currentUser) return;
+    const unsub = onSnapshot(
+      collection(db, 'drivers'),
+      (snap) => {
+        setDrivers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Driver)));
+      },
+      (err) => {
+        console.error('Drivers listener error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.LIST, 'drivers')));
       }
-    } else if (loadedOrders.length > 0 && !selectedOrder) {
-      setSelectedOrder(loadedOrders[0]);
+    );
+    return () => unsub();
+  }, [currentUser]);
+
+  const loadOrders = useCallback(async () => {
+    if (!auth.currentUser) {
+      setLoadingOrders(false);
+      return;
+    }
+    setLoadingOrders(true);
+    setOrdersError(null);
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/admin/orders', {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || `Failed to load orders (${res.status})`);
+      }
+      const loadedOrders: Order[] = Array.isArray(data.orders) ? data.orders : [];
+      setOrders(loadedOrders);
+
+      const orderIdParam = searchParams.get('order');
+      if (orderIdParam) {
+        const matched = loadedOrders.find(o => o.id === orderIdParam);
+        if (matched) setSelectedOrder(matched);
+      } else if (loadedOrders.length > 0) {
+        setSelectedOrder(prev =>
+          prev ? loadedOrders.find(o => o.id === prev.id) || loadedOrders[0] : loadedOrders[0]
+        );
+      } else {
+        setSelectedOrder(null);
+      }
+    } catch (err) {
+      setOrdersError((err as Error)?.message || 'Unable to load orders from server.');
+    } finally {
+      setLoadingOrders(false);
     }
   }, [searchParams]);
 
-  const updateOrdersState = (newOrders: Order[]) => {
-    setOrders(newOrders);
-    saveStoredOrders(newOrders);
-  };
+  useEffect(() => {
+    if (currentUser) {
+      loadOrders();
+    }
+  }, [currentUser, loadOrders]);
 
-  const handleStatusChange = (orderId: string, newStatus: OrderStatus, extraData: Partial<Order> = {}) => {
-    const updatedOrders = orders.map(o => 
-      o.id === orderId ? { ...o, status: newStatus, updatedAt: new Date().toISOString(), ...extraData } : o
-    );
-    updateOrdersState(updatedOrders);
-    if (selectedOrder?.id === orderId) {
-      setSelectedOrder(updatedOrders.find(o => o.id === orderId) || null);
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus, extraData: Partial<Order> = {}) => {
+    if (!auth.currentUser) return;
+    setUpdatingOrderId(orderId);
+    setOrdersError(null);
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          status: newStatus,
+          ...extraData,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.order) {
+        throw new Error(data.message || `Failed to update order (${res.status})`);
+      }
+      const updatedOrder: Order = data.order;
+      setOrders(prev => prev.map(o => (o.id === orderId ? updatedOrder : o)));
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder(updatedOrder);
+      }
+    } catch (err) {
+      setOrdersError((err as Error)?.message || 'Failed to update order status.');
+    } finally {
+      setUpdatingOrderId(null);
     }
   };
 
@@ -132,11 +201,21 @@ export default function Orders() {
               </option>
             ))}
           </select>
+          <Button variant="outline" size="sm" onClick={loadOrders} disabled={loadingOrders} className="border-neutral-300 hover:bg-neutral-50">
+            <RefreshCw className={`w-4 h-4 mr-1.5 ${loadingOrders ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
           <Button variant="outline" size="sm" onClick={handleExportCSV} className="border-neutral-300 hover:bg-neutral-50">
             <Download className="w-4 h-4 mr-1.5" /> CSV
           </Button>
         </div>
       </div>
+
+      {ordersError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-center gap-3 text-sm">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+          <span>{ordersError}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -202,19 +281,27 @@ export default function Orders() {
         <div className="lg:col-span-1">
           {selectedOrder ? (
             <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 sticky top-24">
-              <div className="flex justify-between items-start mb-6">
+              <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-navy">Order #{selectedOrder.id}</h3>
                   <p className="text-sm text-text-muted">{selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleString() : ''}</p>
                 </div>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${STATUS_COLORS[selectedOrder.status || 'NEW'] || 'bg-gray-100 text-gray-800'}`}>
-                  {selectedOrder.status?.replace(/_/g, ' ')}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${STATUS_COLORS[selectedOrder.status || 'NEW'] || 'bg-gray-100 text-gray-800'}`}>
+                    {selectedOrder.status?.replace(/_/g, ' ')}
+                  </span>
+                  <span className="text-[11px] font-semibold text-text-muted">
+                    Payment: {selectedOrder.paymentStatus || 'PENDING'}
+                    {selectedOrder.pesapalConfirmationCode ? ` (${selectedOrder.pesapalConfirmationCode})` : ''}
+                  </span>
+                </div>
               </div>
 
               {/* Status Manager */}
               <div className="mb-6 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
-                <label className="block text-sm font-semibold text-navy mb-2">Update Status & Workflow</label>
+                <label className="block text-sm font-semibold text-navy mb-2">
+                  Update Status &amp; Workflow {updatingOrderId === selectedOrder.id ? '(Saving...)' : ''}
+                </label>
                 <div className="flex gap-2 flex-wrap mb-4">
                   {selectedOrder.status === 'CONFIRMED' && (
                     <Button size="sm" onClick={() => handleStatusChange(selectedOrder.id!, 'PROCESSING')}>
@@ -241,7 +328,7 @@ export default function Orders() {
                           }}
                         >
                           <option value="">Select a Driver...</option>
-                          {mockDrivers.map(d => (
+                          {drivers.map(d => (
                             <option key={d.id} value={d.id}>{d.name} ({d.status})</option>
                           ))}
                         </select>
@@ -287,7 +374,7 @@ export default function Orders() {
                     </h4>
                     <p className="text-sm">
                       <span className="text-text-muted">Assigned Driver:</span>{' '}
-                      <span className="font-medium text-navy">{mockDrivers.find(d => d.id === selectedOrder.driverId)?.name || 'Unknown'}</span>
+                      <span className="font-medium text-navy">{drivers.find(d => d.id === selectedOrder.driverId)?.name || selectedOrder.driverId}</span>
                     </p>
                     {selectedOrder.proofOfDelivery && (
                       <div className="mt-2 text-sm">

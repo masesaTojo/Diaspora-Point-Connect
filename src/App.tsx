@@ -4,6 +4,8 @@ import { CustomerLayout } from './components/layout/CustomerLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
 import { ShopProvider } from './contexts/ShopContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { RequireRole } from './components/auth/RequireRole';
+import { STAFF_ROLES, ADMIN_ROUTE_ROLES } from './lib/rbac';
 
 // Customer Pages
 import Home from './pages/customer/Home';
@@ -63,20 +65,27 @@ export default function App() {
           </Route>
 
         {/* Control Center Routes */}
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="sales" element={<Orders />} />
-          <Route path="catalog" element={<Catalog />} />
-          <Route path="inventory" element={<Inventory />} />
-          <Route path="logistics" element={<Logistics />} />
-          <Route path="suppliers" element={<Suppliers />} />
-          <Route path="customers" element={<Customers />} />
-          <Route path="marketing" element={<Marketing />} />
-          <Route path="content" element={<Content />} />
-          <Route path="gift-builder" element={<GiftBuilderManager />} />
-          <Route path="migration" element={<SystemMigration />} />
-          <Route path="analytics" element={<Analytics />} />
-          <Route path="settings" element={<Settings />} />
+        <Route
+          path="/admin"
+          element={
+            <RequireRole allowedRoles={STAFF_ROLES} title="Control Center">
+              <AdminLayout />
+            </RequireRole>
+          }
+        >
+          <Route index element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.dashboard}><Dashboard /></RequireRole>} />
+          <Route path="sales" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.sales}><Orders /></RequireRole>} />
+          <Route path="catalog" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.catalog}><Catalog /></RequireRole>} />
+          <Route path="inventory" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.inventory}><Inventory /></RequireRole>} />
+          <Route path="logistics" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.logistics}><Logistics /></RequireRole>} />
+          <Route path="suppliers" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.suppliers}><Suppliers /></RequireRole>} />
+          <Route path="customers" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.customers}><Customers /></RequireRole>} />
+          <Route path="marketing" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.marketing}><Marketing /></RequireRole>} />
+          <Route path="content" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.content}><Content /></RequireRole>} />
+          <Route path="gift-builder" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.giftBuilder}><GiftBuilderManager /></RequireRole>} />
+          <Route path="migration" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.migration}><SystemMigration /></RequireRole>} />
+          <Route path="analytics" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.analytics}><Analytics /></RequireRole>} />
+          <Route path="settings" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.settings}><Settings /></RequireRole>} />
         </Route>
 
         {/* 404 Route */}

@@ -1,15 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { Database, ShieldCheck, AlertCircle, CheckCircle2, Loader2, Play } from 'lucide-react';
+import { Database, ShieldCheck, ShieldAlert, AlertCircle, CheckCircle2, Loader2, Play } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 import { seedDatabase, isDatabaseEmpty } from '@/src/lib/firebaseSeeder';
+import { useAuth } from '@/src/contexts/AuthContext';
 
 export default function SystemMigration() {
+  const { hasRole, loading } = useAuth();
+  const isSuperAdmin = hasRole('SUPER_ADMIN');
   const [status, setStatus] = useState<'IDLE' | 'CHECKING' | 'EMPTY' | 'NOT_EMPTY' | 'SEEDING' | 'SUCCESS' | 'ERROR'>('IDLE');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    checkStatus();
-  }, []);
+    if (!loading && isSuperAdmin) {
+      checkStatus();
+    }
+  }, [loading, isSuperAdmin]);
+
+  if (loading) {
+    return (
+      <div className="p-12 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-dpc-blue animate-spin mr-2" />
+        <span className="text-sm font-semibold text-navy">Verifying administrator permissions...</span>
+      </div>
+    );
+  }
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="max-w-xl mx-auto p-8 bg-white rounded-2xl border border-red-200 text-center space-y-3">
+        <ShieldAlert className="w-10 h-10 text-red-600 mx-auto" />
+        <h2 className="text-xl font-bold text-navy">Access Denied</h2>
+        <p className="text-sm text-text-muted">Only a verified SUPER_ADMIN may access database migration and seeding tools.</p>
+      </div>
+    );
+  }
 
   const checkStatus = async () => {
     setStatus('CHECKING');
@@ -24,6 +48,7 @@ export default function SystemMigration() {
   };
 
   const handleSeed = async () => {
+    if (!isSuperAdmin) return;
     setError(null);
     setStatus('SEEDING');
     try {

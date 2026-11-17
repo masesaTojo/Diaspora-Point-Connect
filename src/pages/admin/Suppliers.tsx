@@ -1,14 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Supplier, Product } from '@/src/types';
-import { getStoredSuppliers, saveStoredSuppliers, getStoredProducts, recordStockReceipt } from '@/src/lib/adminStorage';
+import { InventoryRecord, Supplier } from '@/src/types';
+import { useShop } from '@/src/contexts/ShopContext';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { db } from '@/src/lib/firebase';
+import { collection, doc, getDoc, onSnapshot, orderBy, query, setDoc, writeBatch } from 'firebase/firestore';
+import { buildFirestoreErrorInfo, OperationType, stripUndefined } from '@/src/lib/firestoreErrors';
 import { Search, Plus, MapPin, Mail, Phone, ShoppingCart, Check, X, Building, Clock, Edit2 } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 
 export default function Suppliers() {
+  const { products } = useShop();
+  const { currentUser, logAction } = useAuth();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Add / Edit Supplier Modal
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
@@ -34,9 +40,18 @@ export default function Suppliers() {
   });
 
   useEffect(() => {
-    setSuppliers(getStoredSuppliers());
-    setProducts(getStoredProducts());
-  }, []);
+    if (!currentUser) return;
+    const unsub = onSnapshot(
+      query(collection(db, 'suppliers'), orderBy('name')),
+      (snap) => {
+        setSuppliers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Supplier)));
+      },
+      (err) => {
+        console.error('Suppliers listener error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.LIST, 'suppliers')));
+      }
+    );
+    return () => unsub();
+  }, [currentUser]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -76,41 +91,45 @@ export default function Suppliers() {
     setIsSupplierModalOpen(true);
   };
 
-  const handleSaveSupplier = (e: React.FormEvent) => {
+  const handleSaveSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supplierFormData.name.trim()) return;
+    if (!supplierFormData.name.trim() || saving) return;
 
-    if (editingSupplier) {
-      const updated = suppliers.map(s => {
-        if (s.id === editingSupplier.id) {
-          return {
-            ...s,
-            ...supplierFormData
-          };
-        }
-        return s;
-      });
-      setSuppliers(updated);
-      saveStoredSuppliers(updated);
-      showToast(`Supplier "${supplierFormData.name}" updated successfully.`);
-    } else {
-      const newSupplier: Supplier = {
-        id: `sup-${Date.now()}`,
-        name: supplierFormData.name,
-        contactEmail: supplierFormData.contactEmail,
-        contactPhone: supplierFormData.contactPhone,
-        location: supplierFormData.location,
-        leadTimeDays: supplierFormData.leadTimeDays,
+    setSaving(true);
+    try {
+      const supplierId = editingSupplier ? editingSupplier.id : `sup-${Date.now()}`;
+      const payload: Supplier = stripUndefined({
+        id: supplierId,
+        name: supplierFormData.name.trim(),
+        contactEmail: supplierFormData.contactEmail.trim(),
+        contactPhone: supplierFormData.contactPhone.trim(),
+        location: supplierFormData.location.trim(),
+        leadTimeDays: Math.max(1, Number(supplierFormData.leadTimeDays) || 1),
         paymentTerms: supplierFormData.paymentTerms,
         status: supplierFormData.status,
-        suppliedProductIds: []
-      };
-      const updated = [newSupplier, ...suppliers];
-      setSuppliers(updated);
-      saveStoredSuppliers(updated);
-      showToast(`New supplier "${newSupplier.name}" added successfully.`);
+        suppliedProductIds: editingSupplier?.suppliedProductIds || [],
+      });
+
+      await setDoc(doc(db, 'suppliers', supplierId), payload);
+      await logAction(
+        editingSupplier ? 'UPDATE' : 'CREATE',
+        'Supplier',
+        supplierId,
+        editingSupplier?.name,
+        payload.name
+      );
+      showToast(
+        editingSupplier
+          ? `Supplier "${payload.name}" updated in Firestore.`
+          : `New supplier "${payload.name}" added.`
+      );
+      setIsSupplierModalOpen(false);
+    } catch (err) {
+      console.error('Supplier save error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.WRITE, 'suppliers')));
+      showToast('Failed to save supplier to Firestore.');
+    } finally {
+      setSaving(false);
     }
-    setIsSupplierModalOpen(false);
   };
 
   const handleOpenPO = (supplier?: Supplier) => {
@@ -125,25 +144,67 @@ export default function Suppliers() {
     setIsPOModalOpen(true);
   };
 
-  const handleCreatePO = (e: React.FormEvent) => {
+  const handleCreatePO = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSupplierForPO || !poData.productId) return;
+    if (!selectedSupplierForPO || !poData.productId || poData.quantity <= 0 || saving) return;
 
+    setSaving(true);
+    const now = new Date().toISOString();
     const prod = products.find(p => p.id === poData.productId);
     const prodName = prod ? prod.name : 'Product';
+    const poRefCode = `PO-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    // Record stock receipt into inventory ledger
-    recordStockReceipt(
-      poData.productId,
-      poData.quantity,
-      selectedSupplierForPO.name,
-      `PO-${Math.floor(100000 + Math.random() * 900000)}`,
-      poData.unitCost,
-      poData.notes
-    );
+    try {
+      const prodRef = doc(db, 'products', poData.productId);
+      const invRef = doc(db, 'inventoryRecords', poData.productId);
+      const [prodSnap, invSnap] = await Promise.all([getDoc(prodRef), getDoc(invRef)]);
 
-    showToast(`PO issued to ${selectedSupplierForPO.name} & received +${poData.quantity} units of "${prodName}".`);
-    setIsPOModalOpen(false);
+      const existingInv = invSnap.exists() ? (invSnap.data() as Partial<InventoryRecord>) : undefined;
+      const baseStock = existingInv?.stock ?? (prodSnap.exists() ? Number(prodSnap.data().inventory ?? 0) : (prod?.inventory ?? 0));
+      const nextStock = Math.max(0, baseStock + Number(poData.quantity));
+
+      const batch = writeBatch(db);
+      if (prodSnap.exists()) {
+        batch.update(prodRef, {
+          inventory: nextStock,
+          availability: nextStock > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
+          updatedAt: now,
+        });
+      }
+
+      batch.set(invRef, {
+        productId: poData.productId,
+        stock: nextStock,
+        reserved: Number(existingInv?.reserved ?? 0),
+        damaged: Number(existingInv?.damaged ?? 0),
+        sold: Number(existingInv?.sold ?? 0),
+        incoming: Number(existingInv?.incoming ?? 0),
+        lowStockThreshold: Number(existingInv?.lowStockThreshold ?? 8),
+        updatedAt: now,
+      });
+
+      const movId = `mov-${Date.now()}`;
+      batch.set(doc(db, 'stockMovements', movId), {
+        id: movId,
+        productId: poData.productId,
+        productName: prodName,
+        change: Number(poData.quantity),
+        type: 'RECEIVED',
+        notes: `${poRefCode} (${selectedSupplierForPO.name}, $${Number(poData.unitCost).toFixed(2)}/unit): ${poData.notes}`,
+        timestamp: now,
+      });
+
+      await batch.commit();
+      await logAction('ISSUE_PO', 'Supplier', selectedSupplierForPO.id, undefined, `${poRefCode}: +${poData.quantity} ${prodName}`);
+
+      showToast(`PO ${poRefCode} issued to ${selectedSupplierForPO.name} (+${poData.quantity} units of "${prodName}").`);
+      setIsPOModalOpen(false);
+    } catch (err) {
+      console.error('PO creation error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.WRITE, 'stockMovements')));
+      showToast('Failed to record Purchase Order in Firestore.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -164,7 +225,7 @@ export default function Suppliers() {
         </div>
         
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => handleOpenPO()} className="flex items-center gap-2 border-neutral-300">
+          <Button variant="outline" onClick={() => handleOpenPO()} disabled={suppliers.length === 0} className="flex items-center gap-2 border-neutral-300">
             <ShoppingCart className="h-4 w-4" /> New Purchase Order
           </Button>
           <Button onClick={handleOpenAddSupplier} className="flex items-center gap-2 bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
@@ -186,73 +247,79 @@ export default function Suppliers() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredSuppliers.map(supplier => (
-          <div key={supplier.id} className="bg-white rounded-xl border border-neutral-200 p-6 shadow-sm flex flex-col justify-between hover:border-dpc-blue/40 transition-colors">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-dpc-blue flex items-center justify-center font-bold">
-                    <Building className="w-4 h-4" />
+      {filteredSuppliers.length === 0 ? (
+        <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center text-sm text-text-muted">
+          No suppliers found. Add a local vendor or initialize the database in Database Setup.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredSuppliers.map(supplier => (
+            <div key={supplier.id} className="bg-white rounded-xl border border-neutral-200 p-6 shadow-sm flex flex-col justify-between hover:border-dpc-blue/40 transition-colors">
+              <div>
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-dpc-blue flex items-center justify-center font-bold">
+                      <Building className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-base font-bold text-navy">{supplier.name}</h3>
                   </div>
-                  <h3 className="text-base font-bold text-navy">{supplier.name}</h3>
-                </div>
-                <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${supplier.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                  {supplier.status}
-                </span>
-              </div>
-              
-              <div className="space-y-2 text-xs text-text-muted mb-4">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-3.5 w-3.5 text-neutral-400" /> {supplier.location}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-3.5 w-3.5 text-neutral-400" /> {supplier.contactPhone}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-3.5 w-3.5 text-neutral-400" /> {supplier.contactEmail}
-                </div>
-              </div>
-
-              <div className="border-t border-neutral-100 pt-3 space-y-1.5 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Lead Time:</span>
-                  <span className="font-semibold text-navy flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-neutral-400" /> {supplier.leadTimeDays} days
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${supplier.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                    {supplier.status}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Payment Terms:</span>
-                  <span className="font-semibold text-navy">{supplier.paymentTerms}</span>
+                
+                <div className="space-y-2 text-xs text-text-muted mb-4">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-3.5 w-3.5 text-neutral-400" /> {supplier.location}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-3.5 w-3.5 text-neutral-400" /> {supplier.contactPhone}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-3.5 w-3.5 text-neutral-400" /> {supplier.contactEmail}
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Supplied Products:</span>
-                  <span className="font-semibold text-navy">{supplier.suppliedProductIds?.length || 1} catalog items</span>
+
+                <div className="border-t border-neutral-100 pt-3 space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-text-muted">Lead Time:</span>
+                    <span className="font-semibold text-navy flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-neutral-400" /> {supplier.leadTimeDays} days
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-muted">Payment Terms:</span>
+                    <span className="font-semibold text-navy">{supplier.paymentTerms}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-muted">Supplied Products:</span>
+                    <span className="font-semibold text-navy">{supplier.suppliedProductIds?.length || 0} catalog items</span>
+                  </div>
                 </div>
               </div>
+              
+              <div className="mt-5 pt-3 border-t border-neutral-100 flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleOpenPO(supplier)}
+                  className="flex-1 text-xs border-neutral-300 hover:bg-blue-50 hover:text-dpc-blue"
+                >
+                  <ShoppingCart className="w-3.5 h-3.5 mr-1" /> Order PO
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => handleOpenEditSupplier(supplier)}
+                  className="text-xs text-navy hover:bg-neutral-100"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
             </div>
-            
-            <div className="mt-5 pt-3 border-t border-neutral-100 flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => handleOpenPO(supplier)}
-                className="flex-1 text-xs border-neutral-300 hover:bg-blue-50 hover:text-dpc-blue"
-              >
-                <ShoppingCart className="w-3.5 h-3.5 mr-1" /> Order PO
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => handleOpenEditSupplier(supplier)}
-                className="text-xs text-navy hover:bg-neutral-100"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Add / Edit Supplier Modal */}
       {isSupplierModalOpen && (
@@ -360,8 +427,8 @@ export default function Suppliers() {
                 <Button type="button" variant="outline" onClick={() => setIsSupplierModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
-                  {editingSupplier ? 'Update Vendor' : 'Save Supplier'}
+                <Button type="submit" disabled={saving} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
+                  {saving ? 'Saving...' : editingSupplier ? 'Update Vendor' : 'Save Supplier'}
                 </Button>
               </div>
             </form>
@@ -445,8 +512,8 @@ export default function Suppliers() {
                 <Button type="button" variant="outline" onClick={() => setIsPOModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
-                  Issue PO & Receive Stock
+                <Button type="submit" disabled={saving} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
+                  {saving ? 'Issuing...' : 'Issue PO & Receive Stock'}
                 </Button>
               </div>
             </form>
@@ -457,4 +524,3 @@ export default function Suppliers() {
     </div>
   );
 }
-

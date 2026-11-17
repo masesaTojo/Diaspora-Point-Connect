@@ -23,10 +23,13 @@ import {
   Heart,
   ShoppingBag
 } from 'lucide-react';
-import { Order, OrderStatus } from '@/src/types';
+import { Order } from '@/src/types';
 import { Button } from '@/src/components/ui/Button';
-import { getStoredOrders, subscribeToStorage } from '@/src/lib/adminStorage';
 import { useShop } from '@/src/contexts/ShopContext';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { auth, db } from '@/src/lib/firebase';
+import { collection, deleteDoc, doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '@/src/lib/firestoreErrors';
 
 interface SavedRecipient {
   id: string;
@@ -34,13 +37,18 @@ interface SavedRecipient {
   phone: string;
   city: string;
   address: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export default function Account() {
   const [searchParams] = useSearchParams();
   const { convertPrice, wishlist, toggleWishlist, addToCart, products } = useShop();
+  const { currentUser, loading: authLoading, login } = useAuth();
   const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'orders');
   const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Recipients State
@@ -56,75 +64,110 @@ export default function Account() {
   }, [searchParams]);
 
   useEffect(() => {
-    const loadData = () => {
-      const loadedOrders = getStoredOrders();
-      setOrders(loadedOrders);
-
-      // Check if orderId was passed in query
-      const targetOrderId = searchParams.get('orderId');
-      if (targetOrderId && loadedOrders.length > 0) {
-        const match = loadedOrders.find(o => o.id === targetOrderId);
-        if (match) {
-          setSelectedOrder(match);
-          setActiveTab('orders');
+    const loadCustomerOrders = async () => {
+      if (!auth.currentUser) {
+        setOrders([]);
+        setSelectedOrder(null);
+        return;
+      }
+      setOrdersLoading(true);
+      setOrdersError(null);
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        const res = await fetch('/api/orders/my', {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.message || `Unable to load your orders (${res.status})`);
         }
-      } else if (selectedOrder) {
-        // Keep selected order in sync
-        const updated = loadedOrders.find(o => o.id === selectedOrder.id);
-        if (updated) setSelectedOrder(updated);
+        const loadedOrders: Order[] = Array.isArray(data.orders) ? data.orders : [];
+        setOrders(loadedOrders);
+
+        const targetOrderId = searchParams.get('orderId');
+        if (targetOrderId && loadedOrders.length > 0) {
+          const match = loadedOrders.find(o => o.id === targetOrderId);
+          if (match) {
+            setSelectedOrder(match);
+            setActiveTab('orders');
+          }
+        }
+      } catch (err) {
+        setOrdersError((err as Error)?.message || 'Failed to load orders.');
+      } finally {
+        setOrdersLoading(false);
       }
     };
 
-    loadData();
-    const unsub = subscribeToStorage(['dpc_orders'], loadData);
+    if (!authLoading) {
+      loadCustomerOrders();
+    }
+  }, [searchParams, currentUser, authLoading]);
 
-    const savedRecipients = localStorage.getItem('dpc_recipients');
-    if (savedRecipients) {
+  // Real-time Firestore sync for customer's saved Kenya recipients
+  useEffect(() => {
+    if (!currentUser?.id || !auth.currentUser?.emailVerified) {
+      setRecipients([]);
+      return;
+    }
+    const recipientsPath = `users/${currentUser.id}/recipients`;
+    const unsubscribe = onSnapshot(
+      collection(db, 'users', currentUser.id, 'recipients'),
+      (snapshot) => {
+        setRecipients(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as SavedRecipient)));
+      },
+      (err) => {
+        handleFirestoreError(err, OperationType.LIST, recipientsPath);
+      }
+    );
+    return () => unsubscribe();
+  }, [currentUser?.id]);
+
+  const handleSaveRecipient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentRecipient.name || !currentRecipient.phone || !currentUser?.id) return;
+
+    const nowIso = new Date().toISOString();
+    const recId = currentRecipient.id || `rec-${Date.now()}`;
+    const payload: SavedRecipient = {
+      id: recId,
+      name: currentRecipient.name.trim(),
+      phone: currentRecipient.phone.trim(),
+      city: (currentRecipient.city || 'Nairobi').trim(),
+      address: (currentRecipient.address || '').trim(),
+      createdAt: currentRecipient.createdAt || nowIso,
+      updatedAt: nowIso,
+    };
+
+    try {
+      await setDoc(doc(db, 'users', currentUser.id, 'recipients', recId), payload);
+      setIsEditingRecipient(false);
+      setCurrentRecipient({});
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `users/${currentUser.id}/recipients/${recId}`);
+    }
+  };
+
+  const handleDeleteRecipient = async (id: string) => {
+    if (!currentUser?.id) return;
+    if (confirm('Are you sure you want to delete this recipient?')) {
       try {
-        setRecipients(JSON.parse(savedRecipients));
-      } catch (e) {
-        console.error('Failed to parse saved recipients', e);
+        await deleteDoc(doc(db, 'users', currentUser.id, 'recipients', id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `users/${currentUser.id}/recipients/${id}`);
       }
     }
-
-    return unsub;
-  }, [searchParams]);
-
-  const saveRecipientsToStorage = (newRecipients: SavedRecipient[]) => {
-    setRecipients(newRecipients);
-    localStorage.setItem('dpc_recipients', JSON.stringify(newRecipients));
   };
 
-  const handleSaveRecipient = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentRecipient.name || !currentRecipient.phone) return;
-    
-    if (currentRecipient.id) {
-      // Edit
-      saveRecipientsToStorage(recipients.map(r => r.id === currentRecipient.id ? currentRecipient as SavedRecipient : r));
-    } else {
-      // Add
-      saveRecipientsToStorage([...recipients, { ...currentRecipient, id: Math.random().toString(36).substring(2, 9) } as SavedRecipient]);
-    }
-    setIsEditingRecipient(false);
-    setCurrentRecipient({});
-  };
-
-  const handleDeleteRecipient = (id: string) => {
-    if (confirm('Are you sure you want to delete this recipient?')) {
-      saveRecipientsToStorage(recipients.filter(r => r.id !== id));
-    }
-  };
-
-  // Status simulation update
-  const handleUpdateOrderStatus = (newStatus: OrderStatus) => {
-    if (!selectedOrder) return;
-    const updatedOrder = { ...selectedOrder, status: newStatus, updatedAt: new Date().toISOString() };
-    const updatedOrders = orders.map(o => o.id === selectedOrder.id ? updatedOrder : o);
-    setOrders(updatedOrders);
-    setSelectedOrder(updatedOrder);
-    localStorage.setItem('dpc_orders', JSON.stringify(updatedOrders));
-  };
+  const displayName = currentUser
+    ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email.split('@')[0]
+    : 'Guest Customer';
+  const initials = displayName
+    .split(/\s+/)
+    .map(p => p[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() || 'GC';
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -231,13 +274,13 @@ export default function Account() {
             <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
               <div className="p-6 border-b border-neutral-200 bg-neutral-50 flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-dpc-blue text-white flex items-center justify-center font-bold text-xl shadow-xs">
-                  JD
+                  {initials}
                 </div>
-                <div>
-                  <p className="font-bold text-navy">John Doe</p>
-                  <p className="text-xs text-text-muted">john.doe@example.com</p>
+                <div className="min-w-0">
+                  <p className="font-bold text-navy truncate">{displayName}</p>
+                  <p className="text-xs text-text-muted truncate">{currentUser?.email || 'Not signed in'}</p>
                   <span className="inline-block mt-1 text-[10px] bg-blue-100 text-dpc-blue font-bold px-1.5 py-0.5 rounded">
-                    Diaspora Sender
+                    {currentUser ? 'Verified Customer' : 'Sign In Required'}
                   </span>
                 </div>
               </div>
@@ -293,15 +336,34 @@ export default function Account() {
                 {!selectedOrder ? (
                   <>
                     <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-2xl font-display font-bold text-navy">Order History & Tracking</h2>
+                      <h2 className="text-2xl font-display font-bold text-navy">Order History &amp; Tracking</h2>
                       <span className="text-xs text-text-muted">Total: {orders.length} orders</span>
                     </div>
-                    
-                    {orders.length === 0 ? (
+
+                    {ordersError && (
+                      <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <span>{ordersError}</span>
+                      </div>
+                    )}
+
+                    {!currentUser && !authLoading ? (
+                      <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center shadow-sm">
+                        <User className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
+                        <h3 className="text-xl font-bold text-navy mb-2">Sign in to view your orders</h3>
+                        <p className="text-text-muted mb-6">Order history and delivery tracking are protected to keep your gift details private.</p>
+                        <Button size="lg" onClick={login}>Sign in with Google</Button>
+                      </div>
+                    ) : ordersLoading ? (
+                      <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center shadow-sm">
+                        <RefreshCw className="w-8 h-8 text-dpc-blue animate-spin mx-auto mb-3" />
+                        <p className="text-text-muted text-sm">Loading your verified orders...</p>
+                      </div>
+                    ) : orders.length === 0 ? (
                       <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center shadow-sm">
                         <Package className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
                         <h3 className="text-xl font-bold text-navy mb-2">No orders placed yet</h3>
-                        <p className="text-text-muted mb-6">You haven't placed any gift orders yet. Explore our selection of gifts and hampers for your loved ones in Kenya.</p>
+                        <p className="text-text-muted mb-6">You haven&apos;t placed any gift orders yet. Explore our selection of gifts and hampers for your loved ones in Kenya.</p>
                         <Link to="/shop">
                           <Button size="lg">Explore Gift Catalog</Button>
                         </Link>
@@ -344,7 +406,7 @@ export default function Account() {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm pt-1">
                                   <div>
                                     <span className="text-xs text-text-muted block">Purchaser (Sender):</span>
-                                    <span className="font-medium text-navy">{order.customerName || 'John Doe'}</span>
+                                    <span className="font-medium text-navy">{order.customerName || displayName}</span>
                                   </div>
                                   <div>
                                     <span className="text-xs text-text-muted block">Recipient in Kenya:</span>
@@ -397,8 +459,14 @@ export default function Account() {
 
                       {/* Payment Status Badge */}
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold uppercase tracking-wider bg-green-100 text-green-800 px-3 py-1 rounded-full border border-green-200 flex items-center gap-1">
-                          <Check className="w-3.5 h-3.5" /> Payment {selectedOrder.paymentStatus || 'PAID'}
+                        <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border flex items-center gap-1 ${
+                          selectedOrder.paymentStatus === 'PAID'
+                            ? 'bg-green-100 text-green-800 border-green-200'
+                            : selectedOrder.paymentStatus === 'FAILED'
+                              ? 'bg-red-100 text-red-800 border-red-200'
+                              : 'bg-amber-100 text-amber-800 border-amber-200'
+                        }`}>
+                          <Check className="w-3.5 h-3.5" /> Payment {selectedOrder.paymentStatus || 'PENDING'}
                         </span>
                       </div>
                     </div>
@@ -406,25 +474,16 @@ export default function Account() {
                     {/* Timeline Tracker */}
                     <div className="bg-neutral-50 rounded-xl p-6 border border-neutral-200 mb-8">
                       <OrderTimeline status={selectedOrder.status} />
-
-                      {/* Interactive QA Status Progression Controls */}
-                      <div className="mt-6 pt-4 border-t border-neutral-200 flex flex-wrap items-center justify-between gap-3 text-xs">
-                        <span className="font-semibold text-text-muted flex items-center gap-1.5">
-                          <RefreshCw className="w-3.5 h-3.5 text-dpc-blue" />
-                          Simulate Order Status (QA Progression):
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(['CONFIRMED', 'PROCESSING', 'DISPATCHED', 'DELIVERED', 'CANCELLED'] as OrderStatus[]).map((st) => (
-                            <button
-                              key={st}
-                              onClick={() => handleUpdateOrderStatus(st)}
-                              className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${selectedOrder.status === st ? 'bg-navy text-white border-navy font-bold' : 'bg-white text-text-muted border-neutral-200 hover:bg-neutral-100'}`}
-                            >
-                              {st}
-                            </button>
-                          ))}
+                      {selectedOrder.paymentStatus === 'PENDING' && (
+                        <div className="mt-4 pt-4 border-t border-neutral-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                          <span className="text-amber-800 font-medium">
+                            Awaiting PesaPal settlement verification.
+                          </span>
+                          <Link to={`/checkout?orderId=${selectedOrder.id}&pesapalCallback=1${selectedOrder.pesapalTrackingId ? `&OrderTrackingId=${selectedOrder.pesapalTrackingId}` : ''}`}>
+                            <Button size="sm" variant="outline">Verify Payment Status</Button>
+                          </Link>
                         </div>
-                      </div>
+                      )}
                     </div>
 
                     {/* Customer vs Recipient Explicit Separation Card */}
@@ -447,8 +506,8 @@ export default function Account() {
                             <User className="w-4 h-4 text-dpc-blue" /> Purchaser (Customer / Sender)
                           </h4>
                           <div className="space-y-1 text-sm">
-                            <p><span className="text-text-muted">Name:</span> <span className="font-semibold text-navy">{selectedOrder.customerName || 'John Doe'}</span></p>
-                            <p><span className="text-text-muted">Email:</span> {selectedOrder.customerEmail || 'john.doe@example.com'}</p>
+                            <p><span className="text-text-muted">Name:</span> <span className="font-semibold text-navy">{selectedOrder.customerName || displayName}</span></p>
+                            <p><span className="text-text-muted">Email:</span> {selectedOrder.customerEmail || currentUser?.email || '—'}</p>
                             {selectedOrder.customerPhone && (
                               <p><span className="text-text-muted">Phone:</span> {selectedOrder.customerPhone}</p>
                             )}
@@ -732,14 +791,20 @@ export default function Account() {
             {activeTab === 'addresses' && (
               <div className="bg-white rounded-xl border border-neutral-200 p-8 text-center shadow-sm">
                 <MapPin className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
-                <h2 className="text-2xl font-display font-bold text-navy mb-2">Saved Addresses</h2>
-                <p className="text-text-muted mb-6 max-w-md mx-auto">Manage your overseas billing address and default Kenya delivery hubs.</p>
-                <div className="max-w-md mx-auto bg-neutral-50 p-4 rounded-xl border border-neutral-200 text-left mb-6">
-                  <span className="text-xs font-bold uppercase text-dpc-blue">Primary Diaspora Billing Address</span>
-                  <p className="font-bold text-navy mt-1">John Doe</p>
-                  <p className="text-sm text-text-muted">42 Kingsway Gardens, London, SW1A 1AA, United Kingdom</p>
-                  <p className="text-sm text-text-muted">+44 7911 123456</p>
-                </div>
+                <h2 className="text-2xl font-display font-bold text-navy mb-2">Account Profile & Hubs</h2>
+                <p className="text-text-muted mb-6 max-w-md mx-auto">Your verified overseas account is used for order confirmations and cross-border billing receipts.</p>
+                {currentUser ? (
+                  <div className="max-w-md mx-auto bg-neutral-50 p-4 rounded-xl border border-neutral-200 text-left mb-6 space-y-1">
+                    <span className="text-xs font-bold uppercase text-dpc-blue">Verified Diaspora Account</span>
+                    <p className="font-bold text-navy mt-1">{displayName}</p>
+                    <p className="text-sm text-text-muted">{currentUser.email}</p>
+                    <p className="text-xs text-text-muted pt-1">
+                      Kenya delivery addresses are managed under <button onClick={() => setActiveTab('recipients')} className="text-dpc-blue underline font-medium">My Recipients in Kenya</button>.
+                    </p>
+                  </div>
+                ) : (
+                  <Button onClick={login}>Sign in with Google</Button>
+                )}
               </div>
             )}
 

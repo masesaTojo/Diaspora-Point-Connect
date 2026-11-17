@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Mail, Phone, Calendar } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, Mail, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
 import { Order } from '@/src/types';
+import { auth } from '@/src/lib/firebase';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { Button } from '@/src/components/ui/Button';
 
 interface CustomerSummary {
   email: string;
@@ -11,21 +14,35 @@ interface CustomerSummary {
 }
 
 export default function Customers() {
+  const { currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [customers, setCustomers] = useState<CustomerSummary[]>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Generate customers from local storage orders
-    const savedOrders = localStorage.getItem('dpc_orders');
-    if (savedOrders) {
-      const orders: Partial<Order>[] = JSON.parse(savedOrders);
-      
+  const loadCustomers = useCallback(async () => {
+    if (!auth.currentUser) {
+      setLoadingCustomers(false);
+      return;
+    }
+    setLoadingCustomers(true);
+    setErrorMsg(null);
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/admin/orders', {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || `Failed to load customers (${res.status})`);
+      }
+      const orders: Order[] = Array.isArray(data.orders) ? data.orders : [];
       const customerMap: Record<string, CustomerSummary> = {};
 
       orders.forEach(order => {
         if (!order.customerEmail) return;
         const email = order.customerEmail.toLowerCase();
-        
+
         if (!customerMap[email]) {
           customerMap[email] = {
             email,
@@ -35,18 +52,28 @@ export default function Customers() {
             lastOrderDate: order.createdAt || ''
           };
         }
-        
+
         customerMap[email].totalOrders += 1;
         customerMap[email].totalSpent += (order.total || 0);
-        
+
         if (order.createdAt && (!customerMap[email].lastOrderDate || new Date(order.createdAt) > new Date(customerMap[email].lastOrderDate))) {
           customerMap[email].lastOrderDate = order.createdAt;
         }
       });
 
       setCustomers(Object.values(customerMap).sort((a, b) => b.totalSpent - a.totalSpent));
+    } catch (err) {
+      setErrorMsg((err as Error)?.message || 'Unable to load customer order history.');
+    } finally {
+      setLoadingCustomers(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      loadCustomers();
+    }
+  }, [currentUser, loadCustomers]);
 
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -58,9 +85,19 @@ export default function Customers() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-display font-bold text-navy">Customers</h2>
-          <p className="text-sm text-text-muted">Manage your customer base and view purchasing history.</p>
+          <p className="text-sm text-text-muted">Manage your customer base and view live purchasing history.</p>
         </div>
+        <Button variant="outline" size="sm" onClick={loadCustomers} disabled={loadingCustomers} className="border-neutral-300">
+          <RefreshCw className={`w-4 h-4 mr-1.5 ${loadingCustomers ? 'animate-spin' : ''}`} /> Refresh
+        </Button>
       </div>
+
+      {errorMsg && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-center gap-3 text-sm">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
 
       <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm">
         <div className="relative max-w-md">
@@ -87,15 +124,21 @@ export default function Customers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {filteredCustomers.length === 0 ? (
+              {loadingCustomers ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center text-text-muted">
-                    No customers found. Place an order to see customers here.
+                    Loading customer records...
+                  </td>
+                </tr>
+              ) : filteredCustomers.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-12 text-center text-text-muted">
+                    No customers found.
                   </td>
                 </tr>
               ) : (
-                filteredCustomers.map((customer, idx) => (
-                  <tr key={idx} className="hover:bg-neutral-50 transition-colors">
+                filteredCustomers.map((customer) => (
+                  <tr key={customer.email} className="hover:bg-neutral-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="font-bold text-navy">{customer.name}</div>
                       <div className="flex items-center gap-1 mt-1 text-xs text-text-muted">

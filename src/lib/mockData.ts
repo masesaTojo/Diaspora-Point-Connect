@@ -1,4 +1,4 @@
-import { Product, Category } from "@/src/types";
+import type { Product, Category } from "../types/index.ts";
 
 export const mockCategories: Category[] = [
   { id: "c1", name: "Gifts & Hampers", slug: "gifts", isActive: true },

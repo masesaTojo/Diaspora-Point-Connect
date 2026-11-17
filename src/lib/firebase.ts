@@ -13,11 +13,10 @@ export const storage = getStorage(app);
 // Validate connection
 async function testConnection() {
   try {
-    // @ts-ignore
-    await getDocFromServer(doc(db, '_connection_test', 'init'));
+    await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Firebase is offline. Please check your configuration.");
+      console.error('Please check your Firebase configuration.');
     }
   }
 }

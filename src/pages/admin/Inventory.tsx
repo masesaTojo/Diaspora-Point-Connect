@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Product, InventoryRecord } from '@/src/types';
-import { getStoredProducts, getStoredInventory, saveStoredInventory, saveStoredProducts } from '@/src/lib/adminStorage';
-import { Search, AlertTriangle, ArrowRightLeft, Plus, X, Check, PackagePlus, History, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { InventoryRecord } from '@/src/types';
+import { useShop } from '@/src/contexts/ShopContext';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { db } from '@/src/lib/firebase';
+import { collection, doc, getDoc, onSnapshot, orderBy, query, writeBatch } from 'firebase/firestore';
+import { buildFirestoreErrorInfo, OperationType } from '@/src/lib/firestoreErrors';
+import { Search, AlertTriangle, X, Check, PackagePlus, History, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 
 interface StockMovement {
@@ -9,17 +13,20 @@ interface StockMovement {
   productId: string;
   productName: string;
   change: number;
-  type: 'RECEIVED' | 'ORDER_FULFILLED' | 'DAMAGED_WRITE_OFF' | 'MANUAL_ADJUSTMENT';
-  notes: string;
+  type: 'RECEIVED' | 'SALE' | 'ORDER_FULFILLED' | 'DAMAGED_WRITE_OFF' | 'MANUAL_ADJUSTMENT';
+  notes?: string;
   timestamp: string;
 }
 
 export default function Inventory() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const { products } = useShop();
+  const { currentUser, logAction } = useAuth();
   const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>([]);
+  const [movements, setMovements] = useState<StockMovement[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStockStatus, setFilterStockStatus] = useState<'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'>('ALL');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Modals
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
@@ -32,28 +39,34 @@ export default function Inventory() {
     notes: 'Restock shipment from Nairobi supplier hub'
   });
 
-  // Movement history state (stored in localStorage)
-  const [movements, setMovements] = useState<StockMovement[]>([]);
-
   useEffect(() => {
-    const prods = getStoredProducts();
-    const inv = getStoredInventory();
-    setProducts(prods);
-    setInventoryRecords(inv);
+    if (!currentUser) return;
 
-    const storedMovements = localStorage.getItem('dpc_stock_movements');
-    if (storedMovements) {
-      setMovements(JSON.parse(storedMovements));
-    } else {
-      const initialMovements: StockMovement[] = [
-        { id: 'mov-1', productId: 'p1', productName: 'Kenyan Safari Tea & Coffee Luxury Hamper', change: 35, type: 'RECEIVED', notes: 'Supplier delivery Kericho Highlands', timestamp: new Date(Date.now() - 86400000 * 2).toISOString() },
-        { id: 'mov-2', productId: 'p2', productName: 'Highland Red Rose Elegance Bouquet', change: -1, type: 'ORDER_FULFILLED', notes: 'Fulfilled for order #DPC-849201', timestamp: new Date(Date.now() - 3600000 * 5).toISOString() },
-        { id: 'mov-3', productId: 'p3', productName: 'Velvet Decadence Belgian Chocolate Cake', change: 15, type: 'RECEIVED', notes: 'Bakery fresh batch Westlands', timestamp: new Date(Date.now() - 86400000).toISOString() },
-      ];
-      setMovements(initialMovements);
-      localStorage.setItem('dpc_stock_movements', JSON.stringify(initialMovements));
-    }
-  }, []);
+    const unsubInventory = onSnapshot(
+      collection(db, 'inventoryRecords'),
+      (snap) => {
+        setInventoryRecords(snap.docs.map((d) => d.data() as InventoryRecord));
+      },
+      (err) => {
+        console.error('Inventory listener error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.LIST, 'inventoryRecords')));
+      }
+    );
+
+    const unsubMovements = onSnapshot(
+      query(collection(db, 'stockMovements'), orderBy('timestamp', 'desc')),
+      (snap) => {
+        setMovements(snap.docs.map((d) => ({ id: d.id, ...d.data() } as StockMovement)));
+      },
+      (err) => {
+        console.error('Stock movements listener error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.LIST, 'stockMovements')));
+      }
+    );
+
+    return () => {
+      unsubInventory();
+      unsubMovements();
+    };
+  }, [currentUser]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -69,55 +82,65 @@ export default function Inventory() {
     setIsReceiveModalOpen(true);
   };
 
-  const handleReceiveStockSubmit = (e: React.FormEvent) => {
+  const handleReceiveStockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!receiveForm.productId || receiveForm.quantity <= 0) return;
+    if (!receiveForm.productId || receiveForm.quantity <= 0 || saving) return;
 
+    setSaving(true);
+    const now = new Date().toISOString();
     const targetProduct = products.find(p => p.id === receiveForm.productId);
     const productName = targetProduct ? targetProduct.name : 'Product';
 
-    // 1. Update inventory record
-    const updatedInventory = inventoryRecords.map(rec => {
-      if (rec.productId === receiveForm.productId) {
-        return {
-          ...rec,
-          stock: rec.stock + receiveForm.quantity
-        };
+    try {
+      const prodRef = doc(db, 'products', receiveForm.productId);
+      const invRef = doc(db, 'inventoryRecords', receiveForm.productId);
+      const [prodSnap, invSnap] = await Promise.all([getDoc(prodRef), getDoc(invRef)]);
+
+      const existingInv = invSnap.exists() ? (invSnap.data() as Partial<InventoryRecord>) : undefined;
+      const baseStock = existingInv?.stock ?? (prodSnap.exists() ? Number(prodSnap.data().inventory ?? 0) : (targetProduct?.inventory ?? 0));
+      const nextStock = Math.max(0, baseStock + Number(receiveForm.quantity));
+
+      const batch = writeBatch(db);
+      if (prodSnap.exists()) {
+        batch.update(prodRef, {
+          inventory: nextStock,
+          availability: nextStock > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
+          updatedAt: now,
+        });
       }
-      return rec;
-    });
-    setInventoryRecords(updatedInventory);
-    saveStoredInventory(updatedInventory);
 
-    // 2. Also keep product.inventory in sync
-    const updatedProducts = products.map(p => {
-      if (p.id === receiveForm.productId) {
-        return {
-          ...p,
-          inventory: (p.inventory || 0) + receiveForm.quantity
-        };
-      }
-      return p;
-    });
-    setProducts(updatedProducts);
-    saveStoredProducts(updatedProducts);
+      batch.set(invRef, {
+        productId: receiveForm.productId,
+        stock: nextStock,
+        reserved: Number(existingInv?.reserved ?? 0),
+        damaged: Number(existingInv?.damaged ?? 0),
+        sold: Number(existingInv?.sold ?? 0),
+        incoming: Number(existingInv?.incoming ?? 0),
+        lowStockThreshold: Number(existingInv?.lowStockThreshold ?? 8),
+        updatedAt: now,
+      });
 
-    // 3. Append stock movement log
-    const newMovement: StockMovement = {
-      id: `mov-${Date.now()}`,
-      productId: receiveForm.productId,
-      productName,
-      change: receiveForm.quantity,
-      type: 'RECEIVED',
-      notes: receiveForm.notes,
-      timestamp: new Date().toISOString()
-    };
-    const updatedMovements = [newMovement, ...movements];
-    setMovements(updatedMovements);
-    localStorage.setItem('dpc_stock_movements', JSON.stringify(updatedMovements));
+      const movId = `mov-${Date.now()}`;
+      batch.set(doc(db, 'stockMovements', movId), {
+        id: movId,
+        productId: receiveForm.productId,
+        productName,
+        change: Number(receiveForm.quantity),
+        type: 'RECEIVED',
+        notes: (receiveForm.notes || '').trim() || 'Warehouse restock',
+        timestamp: now,
+      });
 
-    setIsReceiveModalOpen(false);
-    showToast(`Received +${receiveForm.quantity} units for ${productName}.`);
+      await batch.commit();
+      await logAction('STOCK_RECEIVED', 'Inventory', receiveForm.productId, String(baseStock), String(nextStock));
+      setIsReceiveModalOpen(false);
+      showToast(`Received +${receiveForm.quantity} units for ${productName}.`);
+    } catch (err) {
+      console.error('Receive stock error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.WRITE, `inventoryRecords/${receiveForm.productId}`)));
+      showToast('Failed to update stock in Firestore.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const inventoryData = products.map(product => {
@@ -337,8 +360,8 @@ export default function Inventory() {
                 <Button type="button" variant="outline" onClick={() => setIsReceiveModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
-                  Confirm & Update Stock
+                <Button type="submit" disabled={saving} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
+                  {saving ? 'Updating...' : 'Confirm & Update Stock'}
                 </Button>
               </div>
             </form>
@@ -355,7 +378,7 @@ export default function Inventory() {
                 <h3 className="text-lg font-bold text-navy flex items-center gap-2">
                   <History className="w-5 h-5 text-dpc-blue" /> Stock Movement History
                 </h3>
-                <p className="text-xs text-text-muted">Audit trail of receipts, reservations, and manual adjustments.</p>
+                <p className="text-xs text-text-muted">Audit trail of receipts, order deductions, and manual adjustments.</p>
               </div>
               <button onClick={() => setIsMovementModalOpen(false)} className="text-text-muted hover:text-navy">
                 <X className="w-5 h-5" />
@@ -374,7 +397,7 @@ export default function Inventory() {
                       </div>
                       <div>
                         <div className="font-bold text-navy text-sm">{m.productName}</div>
-                        <div className="text-text-muted">{m.notes}</div>
+                        <div className="text-text-muted">{m.notes || m.type}</div>
                         <div className="text-[10px] text-text-muted mt-0.5">{new Date(m.timestamp).toLocaleString()}</div>
                       </div>
                     </div>
@@ -398,4 +421,3 @@ export default function Inventory() {
     </div>
   );
 }
-

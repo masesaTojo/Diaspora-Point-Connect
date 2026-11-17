@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Promotion, Coupon } from '@/src/types';
-import { getStoredPromotions, saveStoredPromotions, getStoredCoupons, saveStoredCoupons } from '@/src/lib/adminStorage';
-import { mockCampaigns } from '@/src/lib/mockData';
-import { Tag, Ticket, Megaphone, Plus, Edit, Trash2, Check, X, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Campaign, Coupon, Promotion } from '@/src/types';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { db } from '@/src/lib/firebase';
+import { collection, doc, onSnapshot, orderBy, query, setDoc, updateDoc } from 'firebase/firestore';
+import { buildFirestoreErrorInfo, OperationType, stripUndefined } from '@/src/lib/firestoreErrors';
+import { Tag, Ticket, Megaphone, Plus, Check, X } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 
 export default function Marketing() {
+  const { currentUser, logAction } = useAuth();
   const [activeTab, setActiveTab] = useState<'promotions' | 'coupons' | 'campaigns'>('promotions');
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [campaigns, setCampaigns] = useState<any[]>(mockCampaigns);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Add Promotion modal
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
@@ -34,9 +38,44 @@ export default function Marketing() {
   });
 
   useEffect(() => {
-    setPromotions(getStoredPromotions());
-    setCoupons(getStoredCoupons());
-  }, []);
+    if (!currentUser) return;
+
+    const unsubPromos = onSnapshot(
+      query(collection(db, 'promotions'), orderBy('name')),
+      (snap) => {
+        setPromotions(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Promotion)));
+      },
+      (err) => {
+        console.error('Promotions listener error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.LIST, 'promotions')));
+      }
+    );
+
+    const unsubCoupons = onSnapshot(
+      query(collection(db, 'coupons'), orderBy('code')),
+      (snap) => {
+        setCoupons(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Coupon)));
+      },
+      (err) => {
+        console.error('Coupons listener error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.LIST, 'coupons')));
+      }
+    );
+
+    const unsubCampaigns = onSnapshot(
+      query(collection(db, 'campaigns'), orderBy('name')),
+      (snap) => {
+        setCampaigns(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Campaign)));
+      },
+      (err) => {
+        console.error('Campaigns listener error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.LIST, 'campaigns')));
+      }
+    );
+
+    return () => {
+      unsubPromos();
+      unsubCoupons();
+      unsubCampaigns();
+    };
+  }, [currentUser]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -64,64 +103,102 @@ export default function Marketing() {
       });
       setIsCouponModalOpen(true);
     } else {
-      showToast('Campaign management is active. Use existing campaign cards below.');
+      showToast('Campaign management is active. Toggle campaign status on the cards below.');
     }
   };
 
-  const handleSavePromo = (e: React.FormEvent) => {
+  const handleSavePromo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!promoForm.name.trim()) return;
+    if (!promoForm.name.trim() || saving) return;
 
-    const newPromo: Promotion = {
-      id: `promo-${Date.now()}`,
-      name: promoForm.name,
-      type: promoForm.type,
-      discountValue: promoForm.discountValue,
-      conditions: { minSpend: promoForm.minSpend },
-      isActive: promoForm.isActive
-    };
+    setSaving(true);
+    try {
+      const promoId = `promo-${Date.now()}`;
+      const newPromo: Promotion = stripUndefined({
+        id: promoId,
+        name: promoForm.name.trim(),
+        type: promoForm.type,
+        discountValue: Number(promoForm.discountValue),
+        conditions: { minSpend: Number(promoForm.minSpend) || 0 },
+        isActive: promoForm.isActive
+      });
 
-    const updated = [newPromo, ...promotions];
-    setPromotions(updated);
-    saveStoredPromotions(updated);
-    showToast(`Promotion "${newPromo.name}" created successfully.`);
-    setIsPromoModalOpen(false);
+      await setDoc(doc(db, 'promotions', promoId), newPromo);
+      await logAction('CREATE', 'Promotion', promoId, undefined, newPromo.name);
+      showToast(`Promotion "${newPromo.name}" saved to Firestore.`);
+      setIsPromoModalOpen(false);
+    } catch (err) {
+      console.error('Save promotion error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.WRITE, 'promotions')));
+      showToast('Failed to save promotion.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleTogglePromoStatus = (promoId: string) => {
-    const updated = promotions.map(p => p.id === promoId ? { ...p, isActive: !p.isActive } : p);
-    setPromotions(updated);
-    saveStoredPromotions(updated);
-    showToast('Promotion status updated.');
+  const handleTogglePromoStatus = async (promo: Promotion) => {
+    const nextState = !promo.isActive;
+    try {
+      await updateDoc(doc(db, 'promotions', promo.id), { isActive: nextState });
+      await logAction('UPDATE', 'Promotion', promo.id, String(promo.isActive), String(nextState));
+      showToast(`Promotion "${promo.name}" ${nextState ? 'activated' : 'deactivated'}.`);
+    } catch (err) {
+      console.error('Toggle promotion error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.UPDATE, `promotions/${promo.id}`)));
+      showToast('Failed to update promotion status.');
+    }
   };
 
-  const handleSaveCoupon = (e: React.FormEvent) => {
+  const handleSaveCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!couponForm.code.trim()) return;
+    if (!couponForm.code.trim() || saving) return;
 
-    const newCoupon: Coupon = {
-      id: `cpn-${Date.now()}`,
-      code: couponForm.code.trim().toUpperCase(),
-      discountValue: couponForm.discountValue,
-      isPercentage: couponForm.isPercentage,
-      minSpend: couponForm.minSpend,
-      usageLimit: couponForm.usageLimit,
-      usedCount: 0,
-      isActive: couponForm.isActive
-    };
+    setSaving(true);
+    try {
+      const couponId = `cpn-${Date.now()}`;
+      const newCoupon: Coupon = stripUndefined({
+        id: couponId,
+        code: couponForm.code.trim().toUpperCase(),
+        discountValue: Number(couponForm.discountValue),
+        isPercentage: couponForm.isPercentage,
+        minSpend: Number(couponForm.minSpend) || 0,
+        usageLimit: Number(couponForm.usageLimit) || 100,
+        usedCount: 0,
+        isActive: couponForm.isActive
+      });
 
-    const updated = [newCoupon, ...coupons];
-    setCoupons(updated);
-    saveStoredCoupons(updated);
-    showToast(`Coupon code "${newCoupon.code}" added.`);
-    setIsCouponModalOpen(false);
+      await setDoc(doc(db, 'coupons', couponId), newCoupon);
+      await logAction('CREATE', 'Coupon', couponId, undefined, newCoupon.code);
+      showToast(`Coupon code "${newCoupon.code}" saved to Firestore.`);
+      setIsCouponModalOpen(false);
+    } catch (err) {
+      console.error('Save coupon error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.WRITE, 'coupons')));
+      showToast('Failed to save coupon.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleToggleCouponStatus = (couponId: string) => {
-    const updated = coupons.map(c => c.id === couponId ? { ...c, isActive: !c.isActive } : c);
-    setCoupons(updated);
-    saveStoredCoupons(updated);
-    showToast('Coupon status updated.');
+  const handleToggleCouponStatus = async (coupon: Coupon) => {
+    const nextState = !coupon.isActive;
+    try {
+      await updateDoc(doc(db, 'coupons', coupon.id), { isActive: nextState });
+      await logAction('UPDATE', 'Coupon', coupon.id, String(coupon.isActive), String(nextState));
+      showToast(`Coupon "${coupon.code}" ${nextState ? 'activated' : 'deactivated'}.`);
+    } catch (err) {
+      console.error('Toggle coupon error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.UPDATE, `coupons/${coupon.id}`)));
+      showToast('Failed to update coupon status.');
+    }
+  };
+
+  const handleToggleCampaignStatus = async (campaign: Campaign) => {
+    const nextState = !campaign.isActive;
+    try {
+      await updateDoc(doc(db, 'campaigns', campaign.id), { isActive: nextState });
+      await logAction('UPDATE', 'Campaign', campaign.id, String(campaign.isActive), String(nextState));
+      showToast(`Campaign "${campaign.name}" ${nextState ? 'activated' : 'paused'}.`);
+    } catch (err) {
+      console.error('Toggle campaign error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.UPDATE, `campaigns/${campaign.id}`)));
+      showToast('Failed to update campaign status.');
+    }
   };
 
   return (
@@ -179,33 +256,41 @@ export default function Marketing() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {promotions.map((promo) => (
-                <tr key={promo.id} className="hover:bg-neutral-50">
-                  <td className="px-6 py-4 font-bold text-navy">{promo.name}</td>
-                  <td className="px-6 py-4 font-mono text-xs">{promo.type}</td>
-                  <td className="px-6 py-4 font-semibold text-dpc-blue">
-                    {promo.type === 'PERCENTAGE' ? `${promo.discountValue}%` : `$${promo.discountValue}`}
-                  </td>
-                  <td className="px-6 py-4 text-text-muted">
-                    {promo.conditions?.minSpend ? `Min Spend: $${promo.conditions.minSpend}` : 'No minimum'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${promo.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                      {promo.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handleTogglePromoStatus(promo.id)}
-                      className="text-xs"
-                    >
-                      {promo.isActive ? 'Deactivate' : 'Activate'}
-                    </Button>
+              {promotions.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-text-muted">
+                    No promotions configured yet.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                promotions.map((promo) => (
+                  <tr key={promo.id} className="hover:bg-neutral-50">
+                    <td className="px-6 py-4 font-bold text-navy">{promo.name}</td>
+                    <td className="px-6 py-4 font-mono text-xs">{promo.type}</td>
+                    <td className="px-6 py-4 font-semibold text-dpc-blue">
+                      {promo.type === 'PERCENTAGE' ? `${promo.discountValue}%` : `$${promo.discountValue}`}
+                    </td>
+                    <td className="px-6 py-4 text-text-muted">
+                      {promo.conditions?.minSpend ? `Min Spend: $${promo.conditions.minSpend}` : 'No minimum'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${promo.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                        {promo.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleTogglePromoStatus(promo)}
+                        className="text-xs"
+                      >
+                        {promo.isActive ? 'Deactivate' : 'Activate'}
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -224,63 +309,82 @@ export default function Marketing() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {coupons.map((coupon) => (
-                <tr key={coupon.id} className="hover:bg-neutral-50">
-                  <td className="px-6 py-4 font-bold text-navy font-mono text-base">{coupon.code}</td>
-                  <td className="px-6 py-4 font-semibold text-dpc-blue">
-                    {coupon.isPercentage ? `${coupon.discountValue}%` : `$${coupon.discountValue}`}
-                    {coupon.minSpend > 0 && <span className="text-xs text-text-muted block">Min ${coupon.minSpend}</span>}
-                  </td>
-                  <td className="px-6 py-4 text-text-muted text-xs">
-                    {coupon.usedCount} / {coupon.usageLimit || '∞'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${coupon.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                      {coupon.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handleToggleCouponStatus(coupon.id)}
-                      className="text-xs"
-                    >
-                      {coupon.isActive ? 'Deactivate' : 'Activate'}
-                    </Button>
+              {coupons.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-text-muted">
+                    No coupon codes configured yet.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                coupons.map((coupon) => (
+                  <tr key={coupon.id} className="hover:bg-neutral-50">
+                    <td className="px-6 py-4 font-bold text-navy font-mono text-base">{coupon.code}</td>
+                    <td className="px-6 py-4 font-semibold text-dpc-blue">
+                      {coupon.isPercentage ? `${coupon.discountValue}%` : `$${coupon.discountValue}`}
+                      {(coupon.minSpend ?? 0) > 0 && <span className="text-xs text-text-muted block">Min ${coupon.minSpend}</span>}
+                    </td>
+                    <td className="px-6 py-4 text-text-muted text-xs">
+                      {coupon.usedCount || 0} / {coupon.usageLimit || '∞'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${coupon.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                        {coupon.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleToggleCouponStatus(coupon)}
+                        className="text-xs"
+                      >
+                        {coupon.isActive ? 'Deactivate' : 'Activate'}
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       )}
 
       {activeTab === 'campaigns' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {campaigns.map((campaign: any) => (
-            <div key={campaign.id} className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
-              <div className="h-32 bg-neutral-200 relative">
-                {campaign.heroImage && (
-                  <img src={campaign.heroImage} alt="" className="w-full h-full object-cover" />
-                )}
-                <div className="absolute top-2 right-2">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${campaign.isActive ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
-                    {campaign.isActive ? 'Active' : 'Draft'}
-                  </span>
+        campaigns.length === 0 ? (
+          <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center text-sm text-text-muted">
+            No seasonal campaigns found in Firestore. Seed data in Database Setup or add campaigns.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {campaigns.map((campaign) => (
+              <div key={campaign.id} className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
+                <div className="h-32 bg-neutral-200 relative">
+                  {campaign.heroImage && (
+                    <img src={campaign.heroImage} alt="" className="w-full h-full object-cover" />
+                  )}
+                  <div className="absolute top-2 right-2">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${campaign.isActive ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
+                      {campaign.isActive ? 'Active' : 'Draft'}
+                    </span>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-bold text-navy text-base mb-1">{campaign.name}</h3>
+                  <p className="text-xs text-text-muted line-clamp-2 mb-4">{campaign.description}</p>
+                  <div className="flex justify-between items-center text-xs border-t border-neutral-100 pt-3">
+                    <span className="text-text-muted">{campaign.productIds?.length || 0} Products</span>
+                    <button
+                      onClick={() => handleToggleCampaignStatus(campaign)}
+                      className="font-semibold text-dpc-blue hover:underline"
+                    >
+                      {campaign.isActive ? 'Set Draft' : 'Activate'}
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="p-4">
-                <h3 className="font-bold text-navy text-base mb-1">{campaign.name}</h3>
-                <p className="text-xs text-text-muted line-clamp-2 mb-4">{campaign.description}</p>
-                <div className="flex justify-between items-center text-xs border-t border-neutral-100 pt-3">
-                  <span className="text-text-muted">{campaign.productIds.length} Products</span>
-                  <span className="font-semibold text-dpc-blue">Seasonal Spotlight</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )
       )}
 
       {/* Add Promotion Modal */}
@@ -359,8 +463,8 @@ export default function Marketing() {
                 <Button type="button" variant="outline" onClick={() => setIsPromoModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
-                  Create Promotion
+                <Button type="submit" disabled={saving} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
+                  {saving ? 'Saving...' : 'Create Promotion'}
                 </Button>
               </div>
             </form>
@@ -444,8 +548,8 @@ export default function Marketing() {
                 <Button type="button" variant="outline" onClick={() => setIsCouponModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
-                  Save Coupon
+                <Button type="submit" disabled={saving} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
+                  {saving ? 'Saving...' : 'Save Coupon'}
                 </Button>
               </div>
             </form>
@@ -456,4 +560,3 @@ export default function Marketing() {
     </div>
   );
 }
-

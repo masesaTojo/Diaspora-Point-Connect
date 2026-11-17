@@ -1,23 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { Product, Category } from '@/src/types';
-import { getStoredProducts, saveStoredProducts, getStoredCategories } from '@/src/lib/adminStorage';
-import { Search, Plus, Filter, Edit, Trash2, Tag, Image as ImageIcon, X, Check, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Product } from '@/src/types';
+import { useShop } from '@/src/contexts/ShopContext';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { ADMIN_ROUTE_ROLES } from '@/src/lib/rbac';
+import { db } from '@/src/lib/firebase';
+import { doc, deleteDoc, writeBatch, getDoc } from 'firebase/firestore';
+import { buildFirestoreErrorInfo, OperationType, stripUndefined } from '@/src/lib/firestoreErrors';
+import { Search, Plus, Edit, Trash2, Tag, Image as ImageIcon, X, Check, AlertTriangle } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 
 export default function Catalog() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const { products, categories: availableCategories } = useShop();
+  const { hasRole, logAction } = useAuth();
+  const canSyncInventory = hasRole(ADMIN_ROUTE_ROLES.inventory);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-
-  const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -32,17 +39,12 @@ export default function Catalog() {
     description: ''
   });
 
-  useEffect(() => {
-    setProducts(getStoredProducts());
-    setAvailableCategories(getStoredCategories());
-  }, []);
-
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const categories = Array.from(new Set(products.map(p => p.primaryCategoryId)));
+  const categories = Array.from(new Set(products.map(p => p.primaryCategoryId).filter(Boolean)));
 
   const handleOpenAdd = () => {
     setProductToEdit(null);
@@ -69,86 +71,141 @@ export default function Catalog() {
       salePrice: product.salePrice || 0,
       inventory: product.inventory,
       status: product.status,
-      occasions: product.occasions.join(', '),
-      imageUrl: product.images[0] || '',
+      occasions: (product.occasions || []).join(', '),
+      imageUrl: product.images?.[0] || '',
       description: product.description || ''
     });
     setIsFormModalOpen(true);
   };
 
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+    if (!formData.name.trim() || saving) return;
 
-    if (productToEdit) {
-      // Update existing
-      const updated = products.map(p => {
-        if (p.id === productToEdit.id) {
-          return {
-            ...p,
-            name: formData.name,
-            primaryCategoryId: formData.category,
-            price: Number(formData.price),
-            salePrice: formData.salePrice > 0 ? Number(formData.salePrice) : undefined,
-            inventory: Number(formData.inventory),
-            status: formData.status,
-            occasions: formData.occasions.split(',').map(s => s.trim()).filter(Boolean),
-            images: [formData.imageUrl || p.images[0]],
-            description: formData.description,
-            updatedAt: new Date().toISOString()
-          };
+    setSaving(true);
+    const now = new Date().toISOString();
+
+    try {
+      const batch = writeBatch(db);
+
+      if (productToEdit) {
+        const { salePrice: _droppedSalePrice, ...existingRest } = productToEdit;
+        const parsedInventory = Math.max(0, Number(formData.inventory) || 0);
+        const updatedProduct = stripUndefined({
+          ...existingRest,
+          id: productToEdit.id,
+          name: formData.name.trim(),
+          slug: existingRest.slug || formData.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          primaryCategoryId: formData.category,
+          price: Number(formData.price),
+          ...(formData.salePrice > 0 ? { salePrice: Number(formData.salePrice) } : {}),
+          inventory: parsedInventory,
+          availability: parsedInventory > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
+          status: formData.status,
+          occasions: formData.occasions.split(',').map(s => s.trim()).filter(Boolean),
+          images: [formData.imageUrl.trim() || productToEdit.images?.[0] || ''],
+          description: formData.description.trim(),
+          createdAt: productToEdit.createdAt || now,
+          updatedAt: now,
+        });
+
+        batch.set(doc(db, 'products', productToEdit.id), updatedProduct);
+
+        if (canSyncInventory) {
+          const invRef = doc(db, 'inventoryRecords', productToEdit.id);
+          const invSnap = await getDoc(invRef);
+          const existingInv = invSnap.exists() ? invSnap.data() : {};
+          batch.set(invRef, {
+            productId: productToEdit.id,
+            stock: parsedInventory,
+            reserved: Number(existingInv.reserved ?? 0),
+            damaged: Number(existingInv.damaged ?? 0),
+            sold: Number(existingInv.sold ?? 0),
+            incoming: Number(existingInv.incoming ?? 0),
+            lowStockThreshold: Number(existingInv.lowStockThreshold ?? 8),
+            updatedAt: now,
+          });
         }
-        return p;
-      });
-      setProducts(updated);
-      saveStoredProducts(updated);
-      showToast(`Updated "${formData.name}" successfully.`);
-    } else {
-      // Add new
-      const newProduct: Product = {
-        id: `p-${Date.now()}`,
-        slug: formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        name: formData.name,
-        primaryCategoryId: formData.category,
-        price: Number(formData.price),
-        salePrice: formData.salePrice > 0 ? Number(formData.salePrice) : undefined,
-        inventory: Number(formData.inventory),
-        status: formData.status,
-        recipients: ['Family', 'Friend'],
-        occasions: formData.occasions.split(',').map(s => s.trim()).filter(Boolean),
-        collections: ['Diaspora Favorites'],
-        tags: ['Kenya', 'Gift'],
-        deliveryZones: ['zone-nairobi', 'zone-mombasa'],
-        isFeatured: false,
-        isBestseller: false,
-        isNewArrival: true,
-        images: [formData.imageUrl || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=600'],
-        description: formData.description || 'Premium gift package.',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      const updated = [newProduct, ...products];
-      setProducts(updated);
-      saveStoredProducts(updated);
-      showToast(`Added new product "${newProduct.name}" to catalog.`);
-    }
 
-    setIsFormModalOpen(false);
+        await batch.commit();
+        await logAction('UPDATE', 'Product', productToEdit.id, productToEdit.name, updatedProduct.name);
+        showToast(`Updated "${updatedProduct.name}" in Firestore.`);
+      } else {
+        const newId = `p-${Date.now()}`;
+        const parsedInventory = Math.max(0, Number(formData.inventory) || 0);
+        const slugBase = formData.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || newId;
+        const newProduct: Product = stripUndefined({
+          id: newId,
+          slug: `${slugBase}-${newId.slice(-4)}`,
+          name: formData.name.trim(),
+          primaryCategoryId: formData.category,
+          price: Number(formData.price),
+          ...(formData.salePrice > 0 ? { salePrice: Number(formData.salePrice) } : {}),
+          inventory: parsedInventory,
+          availability: (parsedInventory > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK') as Product['availability'],
+          status: formData.status,
+          recipients: ['Family', 'Friend'],
+          occasions: formData.occasions.split(',').map(s => s.trim()).filter(Boolean),
+          collections: ['Diaspora Favorites'],
+          tags: ['Kenya', 'Gift'],
+          deliveryZones: ['zone-nairobi', 'zone-mombasa'],
+          isFeatured: false,
+          isBestseller: false,
+          isNewArrival: true,
+          images: [formData.imageUrl.trim() || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=600'],
+          description: formData.description.trim() || 'Premium gift package.',
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        batch.set(doc(db, 'products', newId), newProduct);
+        if (canSyncInventory) {
+          batch.set(doc(db, 'inventoryRecords', newId), {
+            productId: newId,
+            stock: parsedInventory,
+            reserved: 0,
+            damaged: 0,
+            sold: 0,
+            incoming: 0,
+            lowStockThreshold: 8,
+            updatedAt: now,
+          });
+        }
+
+        await batch.commit();
+        await logAction('CREATE', 'Product', newId, undefined, newProduct.name);
+        showToast(`Added "${newProduct.name}" to catalog.`);
+      }
+
+      setIsFormModalOpen(false);
+    } catch (err) {
+      console.error('Catalog save error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.WRITE, 'products')));
+      showToast('Failed to save product to Firestore. Check permissions or fields.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDeleteConfirm = () => {
-    if (!productToDelete) return;
-    const updated = products.filter(p => p.id !== productToDelete.id);
-    setProducts(updated);
-    saveStoredProducts(updated);
-    showToast(`Removed "${productToDelete.name}" from catalog.`);
-    setIsDeleteModalOpen(false);
-    setProductToDelete(null);
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete || saving) return;
+    setSaving(true);
+    try {
+      await deleteDoc(doc(db, 'products', productToDelete.id));
+      await logAction('DELETE', 'Product', productToDelete.id, productToDelete.name, undefined);
+      showToast(`Removed "${productToDelete.name}" from catalog.`);
+      setIsDeleteModalOpen(false);
+      setProductToDelete(null);
+    } catch (err) {
+      console.error('Catalog delete error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.DELETE, `products/${productToDelete.id}`)));
+      showToast('Failed to delete product from Firestore.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          product.primaryCategoryId.toLowerCase().includes(searchTerm.toLowerCase());
+                          (product.primaryCategoryId || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'ALL' || product.primaryCategoryId === categoryFilter;
     const matchesStatus = statusFilter === 'ALL' || product.status === statusFilter;
     return matchesSearch && matchesCategory && matchesStatus;
@@ -237,7 +294,7 @@ export default function Catalog() {
                   <tr key={product.id} className="hover:bg-neutral-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-neutral-100 border border-neutral-200 flex items-center justify-center">
-                        {product.images[0] ? (
+                        {product.images?.[0] ? (
                           <img src={product.images[0]} alt="" className="w-full h-full object-cover" />
                         ) : (
                           <ImageIcon className="h-5 w-5 text-neutral-300" />
@@ -247,7 +304,7 @@ export default function Catalog() {
                     <td className="px-6 py-4">
                       <div className="font-bold text-navy">{product.name}</div>
                       <div className="flex items-center gap-1 mt-1 text-xs text-text-muted">
-                        <Tag className="h-3 w-3" /> {product.occasions.join(', ') || 'All Occasions'}
+                        <Tag className="h-3 w-3" /> {(product.occasions || []).join(', ') || 'All Occasions'}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-text-muted capitalize">
@@ -426,8 +483,8 @@ export default function Catalog() {
                 <Button type="button" variant="outline" onClick={() => setIsFormModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-semibold">
-                  {productToEdit ? 'Save Changes' : 'Create Product'}
+                <Button type="submit" disabled={saving} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-semibold">
+                  {saving ? 'Saving...' : productToEdit ? 'Save Changes' : 'Create Product'}
                 </Button>
               </div>
             </form>
@@ -455,10 +512,11 @@ export default function Catalog() {
                 Cancel
               </Button>
               <Button 
+                disabled={saving}
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white"
                 onClick={handleDeleteConfirm}
               >
-                Delete
+                {saving ? 'Deleting...' : 'Delete'}
               </Button>
             </div>
           </div>
@@ -468,4 +526,3 @@ export default function Catalog() {
     </div>
   );
 }
-

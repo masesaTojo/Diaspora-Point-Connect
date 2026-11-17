@@ -18,12 +18,14 @@ import {
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 import { useShop } from '@/src/contexts/ShopContext';
-import { getStoredOrders, subscribeToStorage } from '@/src/lib/adminStorage';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { auth } from '@/src/lib/firebase';
 import { Order, OrderStatus } from '@/src/types';
 
 export default function TrackOrder() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { convertPrice } = useShop();
+  const { currentUser, login } = useAuth();
   
   const queryOrderId = searchParams.get('orderId') || '';
   const [orderQuery, setOrderQuery] = useState(queryOrderId);
@@ -32,45 +34,74 @@ export default function TrackOrder() {
   const [hasSearched, setHasSearched] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
+  const lookupOrderByIdOrList = async (rawQuery: string, existingList: Order[]): Promise<Order | null> => {
+    const normalized = rawQuery.trim().toLowerCase();
+    const localMatch = existingList.find(o =>
+      o.id.toLowerCase() === normalized ||
+      o.id.toLowerCase().includes(normalized) ||
+      (o.recipientPhone && o.recipientPhone.replace(/\D/g, '').includes(normalized.replace(/\D/g, '')))
+    );
+    if (localMatch) return localMatch;
+
+    if (!auth.currentUser) return null;
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch(`/api/orders/${encodeURIComponent(rawQuery.trim())}`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.order || null;
+      }
+    } catch {
+      // ignore lookup miss
+    }
+    return null;
+  };
+
   useEffect(() => {
-    const loadOrders = () => {
-      const stored = getStoredOrders();
-      setOrders(stored);
-      if (queryOrderId && stored.length > 0) {
-        const found = stored.find(o => 
-          o.id.toLowerCase() === queryOrderId.trim().toLowerCase() ||
-          o.recipientPhone?.replace(/\D/g, '').includes(queryOrderId.trim())
-        );
-        if (found) {
-          setSearchedOrder(found);
-          setNotFound(false);
-        } else {
-          setNotFound(true);
+    const loadMyOrders = async () => {
+      if (!auth.currentUser) {
+        setOrders([]);
+        return;
+      }
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        const res = await fetch('/api/orders/my', {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const list: Order[] = Array.isArray(data.orders) ? data.orders : [];
+        setOrders(list);
+
+        if (queryOrderId) {
+          const found = await lookupOrderByIdOrList(queryOrderId, list);
+          if (found) {
+            setSearchedOrder(found);
+            setNotFound(false);
+          } else {
+            setNotFound(true);
+          }
+          setHasSearched(true);
         }
-        setHasSearched(true);
+      } catch (err) {
+        console.error('Failed to load orders for tracking', err);
       }
     };
 
-    loadOrders();
-    const unsub = subscribeToStorage(['dpc_orders'], loadOrders);
-    return unsub;
-  }, [queryOrderId]);
+    loadMyOrders();
+  }, [queryOrderId, currentUser]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const query = orderQuery.trim().toLowerCase();
+    const query = orderQuery.trim();
     if (!query) return;
 
     setHasSearched(true);
-    setSearchParams({ orderId: orderQuery.trim() });
+    setSearchParams({ orderId: query });
 
-    const found = orders.find(o => 
-      o.id.toLowerCase() === query ||
-      o.id.toLowerCase().includes(query) ||
-      (o.recipientPhone && o.recipientPhone.replace(/\D/g, '').includes(query.replace(/\D/g, ''))) ||
-      (o.customerEmail && o.customerEmail.toLowerCase().includes(query))
-    );
-
+    const found = await lookupOrderByIdOrList(query, orders);
     if (found) {
       setSearchedOrder(found);
       setNotFound(false);
@@ -135,10 +166,17 @@ export default function TrackOrder() {
             </Button>
           </form>
 
+          {!currentUser && (
+            <div className="mt-4 pt-4 border-t border-neutral-100 flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
+              <span>Sign in with Google to view your private order history and live delivery status.</span>
+              <Button type="button" size="sm" variant="outline" onClick={login}>Sign in with Google</Button>
+            </div>
+          )}
+
           {/* Quick Order Suggestions */}
           {orders.length > 0 && !hasSearched && (
             <div className="mt-4 pt-4 border-t border-neutral-100 flex flex-wrap items-center gap-2 text-xs text-text-muted">
-              <span className="font-semibold text-navy">Recent orders:</span>
+              <span className="font-semibold text-navy">Your recent orders:</span>
               {orders.slice(0, 3).map(o => (
                 <button
                   key={o.id}
@@ -165,9 +203,12 @@ export default function TrackOrder() {
             <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
             <h3 className="text-xl font-bold text-navy mb-2">Order Not Found</h3>
             <p className="text-text-muted max-w-md mx-auto mb-6 text-sm">
-              We couldn't locate an order with identifier "{orderQuery}". Please verify your Order ID from your confirmation email or invoice.
+              {currentUser
+                ? `We couldn't locate an order matching "${orderQuery}" for your account.`
+                : 'Please sign in with the Google account used to place your order to track delivery details.'}
             </p>
             <div className="flex flex-wrap justify-center gap-3">
+              {!currentUser && <Button onClick={login}>Sign in with Google</Button>}
               <Button variant="outline" onClick={() => { setOrderQuery(''); setHasSearched(false); }}>
                 Try Another Search
               </Button>

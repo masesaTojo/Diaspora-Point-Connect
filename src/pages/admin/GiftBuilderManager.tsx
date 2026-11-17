@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { GiftBuilderConfig, Product } from '@/src/types';
-import { getStoredGiftConfig, saveStoredGiftConfig, getStoredProducts } from '@/src/lib/adminStorage';
-import { Settings, Plus, X, Package, Check, Layers, Sparkles, CheckSquare, Square } from 'lucide-react';
+import { GiftBuilderConfig } from '@/src/types';
+import { useShop } from '@/src/contexts/ShopContext';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { db } from '@/src/lib/firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { buildFirestoreErrorInfo, OperationType, stripUndefined } from '@/src/lib/firestoreErrors';
+import { Settings, Plus, X, Package, Check, Layers } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 
 export default function GiftBuilderManager() {
-  const [config, setConfig] = useState<GiftBuilderConfig>({
-    isActive: true,
-    minItems: 3,
-    maxItems: 8,
-    bundleDiscountPercentage: 10,
-    components: ['Box / Basket', 'Main Gift Item', 'Greeting Card', 'Add-on Sweets'],
-    eligibleProductIds: []
-  });
-  const [products, setProducts] = useState<Product[]>([]);
+  const { products, giftConfig } = useShop();
+  const { currentUser, logAction } = useAuth();
+  const [config, setConfig] = useState<GiftBuilderConfig>(giftConfig);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Component add state
   const [newComponentName, setNewComponentName] = useState('');
@@ -25,59 +24,89 @@ export default function GiftBuilderManager() {
   const [poolSearch, setPoolSearch] = useState('');
 
   useEffect(() => {
-    const loadedConfig = getStoredGiftConfig();
-    const loadedProducts = getStoredProducts();
-    setProducts(loadedProducts);
-
-    // If eligibleProductIds is empty, default to selecting active products
-    if (!loadedConfig.eligibleProductIds || loadedConfig.eligibleProductIds.length === 0) {
-      loadedConfig.eligibleProductIds = loadedProducts.slice(0, 8).map(p => p.id);
-    }
-    setConfig(loadedConfig);
-  }, []);
+    if (!currentUser) return;
+    const unsub = onSnapshot(
+      doc(db, 'config', 'giftBuilder'),
+      (snap) => {
+        if (snap.exists()) {
+          setConfig(snap.data() as GiftBuilderConfig);
+        } else {
+          setConfig(giftConfig);
+        }
+      },
+      (err) => {
+        console.error('GiftBuilder config listener error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.GET, 'config/giftBuilder')));
+      }
+    );
+    return () => unsub();
+  }, [currentUser, giftConfig]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const persistConfig = async (nextConfig: GiftBuilderConfig, auditDetail: string, toastMsg: string) => {
+    setSaving(true);
+    try {
+      const cleanPayload = stripUndefined({
+        eligibleProductIds: nextConfig.eligibleProductIds || [],
+        components: nextConfig.components || [],
+        minItems: Math.max(1, Number(nextConfig.minItems) || 1),
+        maxItems: Math.max(1, Number(nextConfig.maxItems) || 1),
+        bundleDiscountPercentage: Math.min(100, Math.max(0, Number(nextConfig.bundleDiscountPercentage) || 0)),
+        isActive: Boolean(nextConfig.isActive),
+      });
+      await setDoc(doc(db, 'config', 'giftBuilder'), cleanPayload);
+      await logAction('UPDATE', 'GiftBuilderConfig', 'giftBuilder', undefined, auditDetail);
+      setConfig(cleanPayload);
+      showToast(toastMsg);
+    } catch (err) {
+      console.error('GiftBuilder save error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.WRITE, 'config/giftBuilder')));
+      showToast('Failed to update Gift Builder config in Firestore.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSaveSettings = () => {
-    saveStoredGiftConfig(config);
-    showToast('Gift Builder configuration saved successfully.');
+    persistConfig(
+      config,
+      `min=${config.minItems}, max=${config.maxItems}, discount=${config.bundleDiscountPercentage ?? 0}%`,
+      'Gift Builder configuration saved to Firestore.'
+    );
   };
 
   const handleToggleActive = () => {
     const updated = { ...config, isActive: !config.isActive };
-    setConfig(updated);
-    saveStoredGiftConfig(updated);
-    showToast(updated.isActive ? 'Gift Builder is now active on storefront.' : 'Gift Builder deactivated.');
+    persistConfig(
+      updated,
+      `isActive=${updated.isActive}`,
+      updated.isActive ? 'Gift Builder is now active on storefront.' : 'Gift Builder deactivated.'
+    );
   };
 
   const handleAddComponent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComponentName.trim()) return;
     const trimmed = newComponentName.trim();
-    if (config.components.includes(trimmed)) return;
+    if ((config.components || []).includes(trimmed)) return;
 
     const updated = {
       ...config,
-      components: [...config.components, trimmed]
+      components: [...(config.components || []), trimmed]
     };
-    setConfig(updated);
-    saveStoredGiftConfig(updated);
     setNewComponentName('');
     setIsAddingComponent(false);
-    showToast(`Added component step "${trimmed}".`);
+    persistConfig(updated, `added component "${trimmed}"`, `Added component step "${trimmed}".`);
   };
 
   const handleRemoveComponent = (compName: string) => {
     const updated = {
       ...config,
-      components: config.components.filter(c => c !== compName)
+      components: (config.components || []).filter(c => c !== compName)
     };
-    setConfig(updated);
-    saveStoredGiftConfig(updated);
-    showToast(`Removed "${compName}".`);
+    persistConfig(updated, `removed component "${compName}"`, `Removed "${compName}".`);
   };
 
   const toggleProductEligibility = (productId: string) => {
@@ -88,26 +117,23 @@ export default function GiftBuilderManager() {
       : [...current, productId];
 
     const updated = { ...config, eligibleProductIds: updatedIds };
-    setConfig(updated);
-    saveStoredGiftConfig(updated);
+    persistConfig(updated, `eligible products count=${updatedIds.length}`, 'Updated eligible products pool.');
   };
 
   const selectAllProducts = () => {
     const allIds = products.map(p => p.id);
     const updated = { ...config, eligibleProductIds: allIds };
-    setConfig(updated);
-    saveStoredGiftConfig(updated);
+    persistConfig(updated, `selected all ${allIds.length} products`, `Selected all ${allIds.length} products.`);
   };
 
   const clearAllProducts = () => {
     const updated = { ...config, eligibleProductIds: [] };
-    setConfig(updated);
-    saveStoredGiftConfig(updated);
+    persistConfig(updated, 'cleared all eligible products', 'Cleared eligible products list.');
   };
 
   const filteredPoolProducts = products.filter(p => 
     p.name.toLowerCase().includes(poolSearch.toLowerCase()) ||
-    p.primaryCategoryId.toLowerCase().includes(poolSearch.toLowerCase())
+    (p.primaryCategoryId || '').toLowerCase().includes(poolSearch.toLowerCase())
   );
 
   return (
@@ -130,12 +156,13 @@ export default function GiftBuilderManager() {
           <Button 
             variant={config.isActive ? "outline" : "default"} 
             onClick={handleToggleActive}
+            disabled={saving}
             className="border-neutral-300"
           >
             {config.isActive ? 'Deactivate Builder' : 'Activate Builder'}
           </Button>
-          <Button onClick={handleSaveSettings} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
-            Save Settings
+          <Button onClick={handleSaveSettings} disabled={saving} className="bg-dpc-blue hover:bg-dpc-blue/90 text-white font-bold">
+            {saving ? 'Saving...' : 'Save Settings'}
           </Button>
         </div>
       </div>
@@ -181,7 +208,7 @@ export default function GiftBuilderManager() {
                   min="0"
                   max="100"
                   className="w-full p-2.5 pr-8 border border-neutral-300 rounded-lg text-sm" 
-                  value={config.bundleDiscountPercentage} 
+                  value={config.bundleDiscountPercentage ?? 0} 
                   onChange={e => setConfig({...config, bundleDiscountPercentage: parseInt(e.target.value) || 0})} 
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">%</span>
@@ -205,14 +232,14 @@ export default function GiftBuilderManager() {
               <h3 className="font-bold text-navy flex items-center gap-2">
                 <Layers className="w-5 h-5 text-dpc-blue" /> Gift Step Components
               </h3>
-              <span className="text-xs text-text-muted">{config.components.length} curation steps</span>
+              <span className="text-xs text-text-muted">{(config.components || []).length} curation steps</span>
             </div>
             
             <div className="flex flex-wrap gap-2 mb-3">
-              {config.components.map((comp: string, idx: number) => (
+              {(config.components || []).map((comp: string, idx: number) => (
                 <div key={idx} className="flex items-center gap-1.5 bg-neutral-100 text-navy px-3 py-1.5 rounded-full text-xs font-semibold border border-neutral-200">
                   <span>{comp}</span>
-                  {config.components.length > 1 && (
+                  {(config.components || []).length > 1 && (
                     <button 
                       onClick={() => handleRemoveComponent(comp)}
                       className="text-text-muted hover:text-red-500 rounded-full p-0.5"
@@ -321,7 +348,7 @@ export default function GiftBuilderManager() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg overflow-hidden bg-neutral-100 border border-neutral-200 shrink-0">
-                        {prod.images[0] && <img src={prod.images[0]} alt="" className="w-full h-full object-cover" />}
+                        {prod.images?.[0] && <img src={prod.images[0]} alt="" className="w-full h-full object-cover" />}
                       </div>
                       <div>
                         <div className="font-bold text-navy text-xs sm:text-sm">{prod.name}</div>
@@ -359,4 +386,3 @@ export default function GiftBuilderManager() {
     </div>
   );
 }
-

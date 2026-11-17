@@ -1,16 +1,56 @@
 {
   "entities": {
+    "User": {
+      "title": "User",
+      "description": "Authenticated DPC customer and staff accounts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 254 },
+        "firstName": { "type": "string", "maxLength": 100 },
+        "lastName": { "type": "string", "maxLength": 100 },
+        "roles": { "type": "array" },
+        "phone": { "type": "string", "maxLength": 32 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email", "roles"]
+    },
+    "SavedRecipient": {
+      "title": "Saved Recipient",
+      "description": "Saved gift recipients in Kenya scoped to an authenticated customer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 120 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "city": { "type": "string", "maxLength": 100 },
+        "address": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "phone", "city", "address"]
+    },
+    "AdminMarker": {
+      "title": "Admin Marker",
+      "description": "Server-managed administrative UID markers",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["uid"]
+    },
     "Category": {
       "title": "Category",
       "description": "Product categories",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "slug": { "type": "string" },
-        "parentId": { "type": "string" },
-        "description": { "type": "string" },
-        "imageUrl": { "type": "string" },
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 120 },
+        "slug": { "type": "string", "maxLength": 120 },
+        "parentId": { "type": "string", "maxLength": 128 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "imageUrl": { "type": "string", "maxLength": 1000 },
         "isActive": { "type": "boolean" }
       },
       "required": ["id", "name", "slug", "isActive"]
@@ -20,11 +60,11 @@
       "description": "E-commerce products",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "slug": { "type": "string" },
-        "description": { "type": "string" },
-        "primaryCategoryId": { "type": "string" },
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "slug": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 5000 },
+        "primaryCategoryId": { "type": "string", "maxLength": 128 },
         "price": { "type": "number" },
         "salePrice": { "type": "number" },
         "inventory": { "type": "number" },
@@ -35,74 +75,229 @@
       },
       "required": ["id", "name", "slug", "price", "status"]
     },
+    "InventoryRecord": {
+      "title": "Inventory Record",
+      "description": "Per-product physical stock, reservation, damaged, and reorder threshold counts",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string", "maxLength": 128 },
+        "stock": { "type": "number" },
+        "reserved": { "type": "number" },
+        "damaged": { "type": "number" },
+        "sold": { "type": "number" },
+        "incoming": { "type": "number" },
+        "lowStockThreshold": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["productId", "stock", "reserved", "damaged", "sold", "incoming", "lowStockThreshold"]
+    },
+    "StockMovement": {
+      "title": "Stock Movement",
+      "description": "Immutable inventory movement audit trail (receipts, sales, adjustments)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "productId": { "type": "string", "maxLength": 128 },
+        "productName": { "type": "string", "maxLength": 200 },
+        "change": { "type": "number" },
+        "type": { "type": "string", "enum": ["RECEIVED", "SALE", "ORDER_FULFILLED", "DAMAGED_WRITE_OFF", "MANUAL_ADJUSTMENT"] },
+        "notes": { "type": "string", "maxLength": 500 },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "productId", "productName", "change", "type", "timestamp"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Local Kenyan artisan, floral, bakery, and grocery vendors",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 160 },
+        "contactEmail": { "type": "string", "maxLength": 254 },
+        "contactPhone": { "type": "string", "maxLength": 32 },
+        "location": { "type": "string", "maxLength": 200 },
+        "suppliedProductIds": { "type": "array" },
+        "leadTimeDays": { "type": "number" },
+        "paymentTerms": { "type": "string", "maxLength": 80 },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+      },
+      "required": ["id", "name", "contactEmail", "contactPhone", "location", "status"]
+    },
     "Order": {
       "title": "Order",
       "description": "Customer orders",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "customerId": { "type": "string" },
+        "id": { "type": "string", "maxLength": 128 },
+        "customerId": { "type": "string", "maxLength": 128 },
         "status": { "type": "string" },
+        "paymentStatus": { "type": "string", "enum": ["PAID", "PENDING", "FAILED", "REFUNDED"] },
+        "paymentMethod": { "type": "string", "maxLength": 64 },
+        "paymentCurrency": { "type": "string", "maxLength": 8 },
+        "paymentAmount": { "type": "number" },
+        "couponCode": { "type": "string", "maxLength": 40 },
+        "pesapalTrackingId": { "type": "string", "maxLength": 128 },
+        "pesapalMerchantReference": { "type": "string", "maxLength": 128 },
+        "pesapalConfirmationCode": { "type": "string", "maxLength": 128 },
+        "stockDeducted": { "type": "boolean" },
+        "paidAt": { "type": "string", "format": "date-time" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "serviceFee": { "type": "number" },
+        "discount": { "type": "number" },
         "total": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "status", "total", "createdAt"]
+      "required": ["id", "customerId", "items", "status", "subtotal", "deliveryFee", "serviceFee", "discount", "total"]
+    },
+    "PaymentTransaction": {
+      "title": "Payment Transaction",
+      "description": "Server-verified PesaPal payment transactions keyed by OrderTrackingId",
+      "type": "object",
+      "properties": {
+        "trackingId": { "type": "string", "maxLength": 128 },
+        "orderId": { "type": "string", "maxLength": 128 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "provider": { "type": "string", "enum": ["PESAPAL"] },
+        "status": { "type": "string", "enum": ["PENDING", "COMPLETED", "FAILED", "INVALID", "REVERSED"] },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 8 },
+        "paymentMethod": { "type": "string", "maxLength": 64 },
+        "confirmationCode": { "type": "string", "maxLength": 128 },
+        "merchantReference": { "type": "string", "maxLength": 128 },
+        "verifiedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["trackingId", "orderId", "customerId", "provider", "status", "amount", "currency"]
     },
     "AuditLog": {
       "title": "Audit Log",
-      "description": "Internal admin audit logs",
+      "description": "Immutable admin audit logs",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "action": { "type": "string" },
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userEmail": { "type": "string", "maxLength": 254 },
+        "action": { "type": "string", "maxLength": 64 },
+        "entity": { "type": "string", "maxLength": 64 },
         "timestamp": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "userId", "action", "timestamp"]
+      "required": ["id", "userId", "action", "entity", "timestamp"]
     },
     "DeliveryZone": {
       "title": "Delivery Zone",
       "description": "Shipping zones and fees",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 120 },
         "fee": { "type": "number" }
       },
       "required": ["id", "name", "fee"]
+    },
+    "Driver": {
+      "title": "Driver",
+      "description": "Courier fleet drivers and shift/zone assignments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 120 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "status": { "type": "string", "enum": ["AVAILABLE", "ON_DELIVERY", "OFF_DUTY"] },
+        "currentZoneId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "name", "phone", "status"]
     },
     "Coupon": {
       "title": "Coupon",
       "description": "Discount codes",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "code": { "type": "string" },
-        "discountValue": { "type": "number" }
+        "id": { "type": "string", "maxLength": 128 },
+        "code": { "type": "string", "maxLength": 40 },
+        "discountValue": { "type": "number" },
+        "isActive": { "type": "boolean" }
       },
-      "required": ["id", "code", "discountValue"]
+      "required": ["id", "code", "discountValue", "isActive"]
+    },
+    "Promotion": {
+      "title": "Promotion",
+      "description": "Promotional discount rules",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 160 },
+        "type": { "type": "string", "enum": ["PERCENTAGE", "FIXED", "PRODUCT", "CATEGORY", "BUNDLE", "OCCASION"] },
+        "discountValue": { "type": "number" },
+        "conditions": { "type": "object" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "name", "type", "discountValue", "isActive"]
+    },
+    "Campaign": {
+      "title": "Campaign",
+      "description": "Seasonal storefront marketing campaigns",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 160 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "heroImage": { "type": "string", "maxLength": 1000 },
+        "productIds": { "type": "array" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "name", "isActive"]
     },
     "CmsSection": {
       "title": "CMS Section",
       "description": "Dynamic homepage sections",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "type": { "type": "string" },
+        "id": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "maxLength": 64 },
+        "isVisible": { "type": "boolean" },
         "order": { "type": "number" }
       },
-      "required": ["id", "type", "order"]
+      "required": ["id", "type", "isVisible", "order"]
+    },
+    "GiftBuilderConfig": {
+      "title": "Gift Builder Config",
+      "description": "Gift builder configuration document",
+      "type": "object",
+      "properties": {
+        "eligibleProductIds": { "type": "array" },
+        "components": { "type": "array" },
+        "minItems": { "type": "number" },
+        "maxItems": { "type": "number" },
+        "bundleDiscountPercentage": { "type": "number" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["isActive"]
     }
   },
   "firestore": {
+    "users": { "schema": "User", "description": "User profiles and roles" },
+    "users/{userId}/recipients": { "schema": "SavedRecipient", "description": "Saved Kenya recipients for signed-in customers" },
+    "admins": { "schema": "AdminMarker", "description": "Admin UID markers" },
     "categories": { "schema": "Category", "description": "Product categories" },
     "products": { "schema": "Product", "description": "E-commerce products" },
+    "inventoryRecords": { "schema": "InventoryRecord", "description": "Inventory tracking records" },
+    "stockMovements": { "schema": "StockMovement", "description": "Immutable stock movement ledger" },
+    "suppliers": { "schema": "Supplier", "description": "Vendor directory" },
     "orders": { "schema": "Order", "description": "Customer orders" },
-    "auditLogs": { "schema": "AuditLog", "description": "System audit logs" },
+    "paymentTransactions": { "schema": "PaymentTransaction", "description": "Server-verified PesaPal payment records" },
+    "auditLogs": { "schema": "AuditLog", "description": "Immutable system audit logs" },
     "deliveryZones": { "schema": "DeliveryZone", "description": "Shipping zones" },
+    "drivers": { "schema": "Driver", "description": "Courier fleet drivers" },
     "coupons": { "schema": "Coupon", "description": "Discount codes" },
+    "promotions": { "schema": "Promotion", "description": "Promotional discount rules" },
+    "campaigns": { "schema": "Campaign", "description": "Seasonal storefront campaigns" },
     "cmsSections": { "schema": "CmsSection", "description": "Homepage sections" },
-    "giftConfig": { "schema": "object", "description": "Gift builder configuration" },
-    "users": { "schema": "object", "description": "User profiles" }
+    "config": { "schema": "GiftBuilderConfig", "description": "System configuration documents (e.g. config/giftBuilder)" }
   }
 }
