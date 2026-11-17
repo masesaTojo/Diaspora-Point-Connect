@@ -13,15 +13,11 @@ import Cart from './pages/customer/Cart';
 import Checkout from './pages/customer/Checkout';
 import Account from './pages/customer/Account';
 import GiftBuilder from './pages/customer/GiftBuilder';
-import Rentals from './pages/customer/Rentals';
-import Advertise from './pages/customer/Advertise';
 import TrackOrder from './pages/customer/TrackOrder';
 import Support from './pages/customer/Support';
 import FAQ from './pages/customer/FAQ';
 import Shipping from './pages/customer/Shipping';
 import Returns from './pages/customer/Returns';
-import PropertyForSale from './pages/customer/PropertyForSale';
-import BusinessDirectory from './pages/customer/BusinessDirectory';
 import AboutUs from './pages/customer/AboutUs';
 
 // Admin Pages
@@ -37,7 +33,7 @@ import Content from './pages/admin/Content';
 import GiftBuilderManager from './pages/admin/GiftBuilderManager';
 import Analytics from './pages/admin/Analytics';
 import Settings from './pages/admin/Settings';
-import Properties from './pages/admin/Properties';
+import SystemMigration from './pages/admin/SystemMigration';
 
 export default function App() {
   return (
@@ -56,14 +52,8 @@ export default function App() {
             <Route path="checkout" element={<Checkout />} />
             <Route path="account" element={<Account />} />
             <Route path="gift-builder" element={<GiftBuilder />} />
-            <Route path="rentals" element={<Rentals />} />
-            <Route path="places-to-stay" element={<Rentals />} />
-            <Route path="property-for-sale" element={<PropertyForSale />} />
-            <Route path="business-directory" element={<BusinessDirectory />} />
             <Route path="about" element={<AboutUs />} />
             <Route path="about-us" element={<AboutUs />} />
-            <Route path="advertise" element={<Advertise />} />
-            <Route path="advertisers" element={<BusinessDirectory />} />
             <Route path="support" element={<Support />} />
             <Route path="contact" element={<AboutUs />} />
             <Route path="track" element={<TrackOrder />} />
@@ -84,7 +74,7 @@ export default function App() {
           <Route path="marketing" element={<Marketing />} />
           <Route path="content" element={<Content />} />
           <Route path="gift-builder" element={<GiftBuilderManager />} />
-          <Route path="properties" element={<Properties />} />
+          <Route path="migration" element={<SystemMigration />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="settings" element={<Settings />} />
         </Route>

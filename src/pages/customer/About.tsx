@@ -6,7 +6,6 @@ import {
   Globe2, 
   Users, 
   Award, 
-  Building2, 
   CheckCircle2, 
   ArrowRight,
   TrendingUp,
@@ -40,7 +39,7 @@ export default function About() {
               About <span className="text-dpc-yellow">Diaspora Point Connect</span>
             </h1>
             <p className="text-lg md:text-xl text-gray-300 leading-relaxed mb-8">
-              We are the premier trusted bridge for the Kenyan diaspora worldwide. Empowering Kenyans abroad to gift, care, book homecoming stays, and invest in verified property back home with total peace of mind.
+              We are the premier trusted bridge for the Kenyan diaspora worldwide. Empowering Kenyans abroad to gift, care, and support loved ones back home with total peace of mind.
             </p>
             <div className="flex flex-wrap gap-4">
               <Link to="/how-it-works">
@@ -70,13 +69,13 @@ export default function About() {
             </h2>
             <div className="space-y-4 text-text text-base leading-relaxed">
               <p>
-                Every Kenyan living abroad knows the recurring heartache: you send funds for your mother’s birthday cake or emergency monthly groceries, only for the money to be diverted or the quality compromised. You try to book a decent apartment for your holiday homecoming, only to find blackouts, dry taps, and broken promises. Worse still, you try to buy land or an apartment, only to lose your hard-earned foreign savings to dishonest middlemen or unverified sellers.
+                Every Kenyan living abroad knows the recurring heartache: you send funds for your mother’s birthday cake or emergency monthly groceries, only for the money to be diverted or the quality compromised. Or you try to send a thoughtful care package through informal channels, only to deal with delays and unverified sellers.
               </p>
               <p>
                 Diaspora Point Connect was founded to eliminate that uncertainty forever. We built a secure, closed-loop ecosystem with independent ground teams in Nairobi, Mombasa, Kisumu, Nakuru, and Eldoret.
               </p>
               <p>
-                Every gift parcel is delivered with photo proof. Every house rental is inspected with automatic generator backup and high-speed WiFi. Every property listing is searched on ArdhiSasa with title verification before listing.
+                Every gift parcel is delivered with photo proof by our vetted local dispatch teams.
               </p>
             </div>
           </div>
@@ -87,7 +86,7 @@ export default function About() {
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <h3 className="font-bold text-2xl text-navy">100%</h3>
-              <p className="text-xs text-text-muted mt-1">Verified Partners & Title Searches</p>
+              <p className="text-xs text-text-muted mt-1">Verified Gift Fulfillment</p>
             </div>
 
             <div className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm text-center">
@@ -184,9 +183,9 @@ export default function About() {
                 Explore The Shop
               </Button>
             </Link>
-            <Link to="/places-to-stay">
+            <Link to="/gift-builder">
               <Button variant="outline" className="border-white/30 text-white hover:bg-white/10 py-3 px-6 rounded-xl">
-                Find Places to Stay
+                Build a Custom Gift
               </Button>
             </Link>
           </div>

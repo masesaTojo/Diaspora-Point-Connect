@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPERS ---
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isEmailVerified() { return request.auth.token.email_verified == true; }
+    
+    // Bootstrapped Admin
+    function isAdmin() { 
+      return isSignedIn() && (
+        request.auth.token.email == 'masesawilson3@gmail.com' || 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['SUPER_ADMIN', 'STORE_MANAGER', 'CONTENT_MANAGER'])
+      ); 
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'masesawilson3@gmail.com' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['SUPER_ADMIN'])
+      );
+    }
+
+    // --- COLLECTION RULES ---
+
+    // USERS
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.keys().hasAll(['id', 'email', 'roles']) &&
+               data.id == userId &&
+               data.roles.size() <= 5;
+      }
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
+      allow update: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming()) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['firstName', 'lastName', 'updatedAt']);
+      allow update: if isSuperAdmin(); // Only Super Admin can change roles
+    }
+
+    // PRODUCTS & CATEGORIES (Public Read, Admin Write)
+    match /products/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /categories/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ORDERS (Owner Read/Create, Admin Write)
+    match /orders/{orderId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // SYSTEM CONFIG & LOGS
+    match /auditLogs/{id} {
+      allow read, write: if isSuperAdmin();
+    }
+    match /config/{id} {
+      allow read: if true; 
+      allow write: if isSuperAdmin();
+    }
+    match /cmsSections/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /deliveryZones/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /coupons/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

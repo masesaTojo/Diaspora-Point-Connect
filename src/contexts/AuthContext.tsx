@@ -1,11 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Role } from '../types';
-import { mockUsers, mockAuditLogs } from '../lib/mockData';
+import { auth, db } from '../lib/firebase';
+import { 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   currentUser: User | null;
-  login: (email: string) => void;
-  logout: () => void;
+  loading: boolean;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
   hasRole: (role: Role | Role[]) => boolean;
   logAction: (action: string, entity: string, entityId?: string, oldValue?: string, newValue?: string) => void;
   auditLogs: any[];
@@ -14,32 +23,67 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<User | null>(mockUsers[0]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const [auditLogs, setAuditLogs] = useState<any[]>(() => {
     const saved = localStorage.getItem('dpc_audit_logs');
-    return saved ? JSON.parse(saved) : mockAuditLogs;
+    return saved ? JSON.parse(saved) : [];
   });
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Fetch or create user profile in Firestore
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        
+        if (userDoc.exists()) {
+          setCurrentUser(userDoc.data() as User);
+        } else {
+          // Create new user profile
+          const newUser: User = {
+            id: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            firstName: firebaseUser.displayName?.split(' ')[0] || '',
+            lastName: firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
+            roles: ['CUSTOMER'], // Default role
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+          setCurrentUser(newUser);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const saveLogs = (logs: any[]) => {
     setAuditLogs(logs);
     localStorage.setItem('dpc_audit_logs', JSON.stringify(logs));
   };
 
-  const login = (email: string) => {
-    const user = mockUsers.find(u => u.email === email);
-    if (user) {
-      setCurrentUser(user);
-      logAction('LOGIN', 'Auth', user.id, undefined, 'Success');
-    } else {
-      logAction('FAILED_LOGIN', 'Auth', undefined, email, 'Failed');
+  const login = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      logAction('LOGIN', 'Auth', undefined, undefined, 'Success');
+    } catch (error) {
+      console.error('Login failed', error);
+      logAction('FAILED_LOGIN', 'Auth', undefined, undefined, 'Failed');
     }
   };
 
-  const logout = () => {
-    if (currentUser) {
-      logAction('LOGOUT', 'Auth', currentUser.id);
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      logAction('LOGOUT', 'Auth');
+    } catch (error) {
+      console.error('Logout failed', error);
     }
-    setCurrentUser(null);
   };
 
   const hasRole = (role: Role | Role[]) => {
@@ -65,10 +109,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       timestamp: new Date().toISOString()
     };
     saveLogs([newLog, ...auditLogs]);
+    // In production, we'd write this to Firestore:
+    // addDoc(collection(db, 'auditLogs'), newLog);
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, logout, hasRole, logAction, auditLogs }}>
+    <AuthContext.Provider value={{ currentUser, loading, login, logout, hasRole, logAction, auditLogs }}>
       {children}
     </AuthContext.Provider>
   );

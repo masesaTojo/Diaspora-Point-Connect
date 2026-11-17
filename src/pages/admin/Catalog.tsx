@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Product } from '@/src/types';
-import { getStoredProducts, saveStoredProducts } from '@/src/lib/adminStorage';
+import { Product, Category } from '@/src/types';
+import { getStoredProducts, saveStoredProducts, getStoredCategories } from '@/src/lib/adminStorage';
 import { Search, Plus, Filter, Edit, Trash2, Tag, Image as ImageIcon, X, Check, AlertTriangle } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 
@@ -17,10 +17,12 @@ export default function Catalog() {
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
+  const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
+
   // Form fields
   const [formData, setFormData] = useState({
     name: '',
-    category: 'gift-baskets',
+    category: 'gifts',
     price: 45,
     salePrice: 0,
     inventory: 25,
@@ -32,6 +34,7 @@ export default function Catalog() {
 
   useEffect(() => {
     setProducts(getStoredProducts());
+    setAvailableCategories(getStoredCategories());
   }, []);
 
   const showToast = (msg: string) => {
@@ -45,7 +48,7 @@ export default function Catalog() {
     setProductToEdit(null);
     setFormData({
       name: '',
-      category: 'gift-baskets',
+      category: availableCategories[0]?.slug || 'gifts',
       price: 45,
       salePrice: 0,
       inventory: 25,
@@ -329,12 +332,9 @@ export default function Catalog() {
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full text-sm p-2.5 border border-neutral-300 rounded-lg bg-white"
                   >
-                    <option value="gift-baskets">Gift Baskets & Hampers</option>
-                    <option value="flowers">Fresh Flowers</option>
-                    <option value="cakes-sweets">Cakes & Sweets</option>
-                    <option value="food-drink">Kenyan Food & Tea</option>
-                    <option value="keepsakes">Artisanal Keepsakes</option>
-                    <option value="family-care">Family Support & Care</option>
+                    {availableCategories.map(cat => (
+                      <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div>

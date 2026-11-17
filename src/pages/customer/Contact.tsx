@@ -44,7 +44,7 @@ export default function Contact() {
             Contact <span className="text-dpc-yellow">Diaspora Point Connect</span>
           </h1>
           <p className="text-gray-300 text-base max-w-xl mx-auto leading-relaxed">
-            Have questions about an existing gift delivery, booking a house rental, inspecting property for sale, or advertising in our verified directory? We are here for you.
+            Have questions about an existing gift delivery or family support groceries? We are here for you.
           </p>
         </div>
       </section>
@@ -215,9 +215,6 @@ export default function Contact() {
                     className="w-full p-3 border border-neutral-300 rounded-xl text-sm focus:ring-2 focus:ring-dpc-blue outline-none bg-white"
                   >
                     <option value="Gifts & Groceries Delivery">Gifts & Groceries Delivery</option>
-                    <option value="Places to Stay / House Rentals">Places to Stay / House Rentals</option>
-                    <option value="Property For Sale / Site Visit">Property For Sale / Site Visit</option>
-                    <option value="Business Directory / Advertising">Business Directory / Advertising</option>
                     <option value="Payment / Currency Question">Payment / Currency Question</option>
                     <option value="General Customer Support">General Customer Support</option>
                   </select>

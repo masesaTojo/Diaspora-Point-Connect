@@ -1,13 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/src/components/ui/Button';
-import { ArrowRight, Package, Heart, Globe, CreditCard, Home as HomeIcon, ShieldCheck, Zap, Wifi, MapPin } from 'lucide-react';
+import { ArrowRight, Package, Heart, Globe, CreditCard } from 'lucide-react';
 import { ProductCard } from '@/src/components/ui/ProductCard';
 import { SectionHeading } from '@/src/components/ui/SectionHeading';
 import { mockRecipients, mockOccasions, mockCollections } from '@/src/lib/mockData';
-import { mockHouseRentals } from '@/src/lib/rentalsAndAdsData';
-import { AdvertisersSection } from '@/src/components/sections/AdvertisersSection';
 import { useShop } from '@/src/contexts/ShopContext';
+import heroFamilyImg from '@/src/assets/images/kenya_diaspora_hero_1794896174680.jpg';
 
 export default function Home() {
   const { products, cmsSections, convertPrice } = useShop();
@@ -28,19 +27,20 @@ export default function Home() {
     <div className="flex flex-col w-full overflow-x-hidden">
       {/* 1. Hero Section */}
       {isSectionVisible('HERO') && (
-        <section className="relative bg-navy-dark text-white min-h-[600px] flex items-center">
+        <section className="relative bg-navy-dark text-white min-h-[600px] flex items-center overflow-hidden">
           <div className="absolute inset-0 z-0">
             <img 
-              src="https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=2000&q=80" 
-              alt="Happy Kenyan Family" 
-              className="w-full h-full object-cover opacity-40"
+              src={heroFamilyImg} 
+              alt="Kenyan family enjoying a delivered Diaspora Point Connect gift hamper and red roses" 
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover object-center sm:object-right opacity-85"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-navy-dark via-navy-dark/80 to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-navy-dark/90 via-navy-dark/60 to-navy-dark/15"></div>
           </div>
           
           <div className="relative z-10 max-w-7xl mx-auto px-4 w-full">
             <div className="max-w-2xl">
-              <h1 className="text-5xl md:text-7xl font-display font-bold mb-6 leading-tight">
+              <h1 className="text-5xl md:text-7xl font-display font-bold text-white mb-6 leading-tight" style={{ textWrap: 'balance' }}>
                 Send Love <span className="text-dpc-yellow">Home.</span>
               </h1>
               <p className="text-xl md:text-2xl text-gray-200 mb-10 leading-relaxed">
@@ -67,12 +67,11 @@ export default function Home() {
       {isSectionVisible('QUICK_SHOP') && (
         <section className="py-12 bg-white border-b border-neutral-100">
           <div className="max-w-7xl mx-auto px-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 md:gap-6">
               {[
                 { name: "Send a Gift", icon: "🎁", color: "bg-pink-50", link: "/shop/category/gifts" },
                 { name: "Flowers & Cakes", icon: "💐", color: "bg-purple-50", link: "/shop/category/flowers" },
                 { name: "Support Home", icon: "🛒", color: "bg-blue-50", link: "/shop/category/family-support" },
-                { name: "House Rentals", icon: "🏡", color: "bg-emerald-50", link: "/rentals" },
                 { name: "Made in Kenya", icon: "🌍", color: "bg-yellow-50", link: "/shop/category/kenya" },
               ].map((cat, i) => (
                 <Link to={cat.link} key={i} className={`flex flex-col items-center justify-center p-6 rounded-2xl cursor-pointer hover:-translate-y-1 transition-transform ${cat.color}`}>
@@ -165,7 +164,7 @@ export default function Home() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div>
                 <span className="text-dpc-yellow font-bold tracking-wider uppercase text-sm mb-4 block">Personalized Experience</span>
-                <h2 className="text-4xl md:text-5xl font-display font-bold mb-6 leading-tight">Build the Perfect Custom Hamper</h2>
+                <h2 className="text-4xl md:text-5xl font-display font-bold text-white mb-6 leading-tight">Build the Perfect Custom Hamper</h2>
                 <p className="text-xl text-blue-100 mb-8 max-w-lg">
                   Select a beautiful basket, add their favorite treats, and include a personalized video message. We'll beautifully wrap and deliver it.
                 </p>
@@ -243,9 +242,14 @@ export default function Home() {
                   subtitle="High-quality groceries, stationery, and household necessities delivered to their door."
                   className="mb-0" 
                 />
+                <Link to="/shop/category/family-support">
+                  <Button variant="ghost" className="hidden sm:flex group">
+                    View All <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </Link>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-                {familySupportProducts.map((product) => (
+                {familySupportProducts.slice(0, 4).map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}
               </div>
@@ -261,6 +265,11 @@ export default function Home() {
                   subtitle="Support local artisans and businesses with our curated selection of Kenyan products."
                   className="mb-0" 
                 />
+                <Link to="/shop/category/kenya">
+                  <Button variant="ghost" className="hidden sm:flex group">
+                    View All <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </Link>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
                 {kenyaProducts.slice(0, 4).map((product) => (
@@ -273,99 +282,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 7b. Vetted House Rentals Showcase */}
-      <section className="py-20 bg-neutral-50 border-t border-neutral-200">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
-            <div>
-              <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100/80 px-3 py-1 rounded-full mb-3">
-                <HomeIcon className="w-3.5 h-3.5 text-emerald-700" />
-                Diaspora Homecoming & Family Accommodations
-              </div>
-              <h2 className="text-3xl md:text-4xl font-display font-bold text-navy">
-                Vetted House Rentals in Kenya
-              </h2>
-              <p className="text-text-muted text-base mt-2 max-w-2xl">
-                Reliable, fully furnished homes with guaranteed generator power backup, fast fiber WiFi, and 24/7 security. Book for your trip home or sponsor comfortable accommodation for family.
-              </p>
-            </div>
-            <Link to="/rentals" className="shrink-0">
-              <Button variant="outline" className="flex items-center gap-2 border-emerald-600/30 text-navy hover:text-emerald-700 hover:bg-emerald-50">
-                View All {mockHouseRentals.length} Rentals <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {mockHouseRentals.slice(0, 3).map((rental) => (
-              <div key={rental.id} className="bg-white rounded-2xl overflow-hidden border border-neutral-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group">
-                <div>
-                  <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100">
-                    <img src={rental.images[0]} alt={rental.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    <div className="absolute top-3 left-3 bg-navy/90 text-white backdrop-blur-md px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-green-400" /> Vetted Stay
-                    </div>
-                    <div className="absolute bottom-3 left-3 right-3 text-white flex items-center justify-between drop-shadow-md">
-                      <span className="text-xs font-medium flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5 text-dpc-yellow shrink-0" />
-                        {rental.location}
-                      </span>
-                      <span className="text-xs bg-white/20 backdrop-blur-md px-2 py-0.5 rounded font-semibold">
-                        {rental.propertyType}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-5">
-                    <h3 className="font-display font-bold text-navy text-lg group-hover:text-dpc-blue transition-colors line-clamp-1 mb-2">
-                      {rental.title}
-                    </h3>
-                    <p className="text-xs text-text-muted line-clamp-2 mb-4">
-                      {rental.description}
-                    </p>
-                    <div className="flex items-center gap-4 text-xs font-medium text-navy pb-3 border-b border-neutral-100">
-                      <span>{rental.bedrooms} Beds</span>
-                      <span>•</span>
-                      <span>{rental.bathrooms} Baths</span>
-                      <span>•</span>
-                      <span>Max {rental.maxGuests} Guests</span>
-                    </div>
-                    <div className="pt-3 space-y-1.5 text-xs text-text-muted">
-                      {rental.amenities.hasGenerator && (
-                        <div className="flex items-center gap-1.5 text-amber-800 bg-amber-50 px-2 py-1 rounded">
-                          <Zap className="w-3.5 h-3.5 text-amber-600" /> Power Backup Generator Included
-                        </div>
-                      )}
-                      {rental.amenities.hasWifi && (
-                        <div className="flex items-center gap-1.5 text-blue-800 bg-blue-50 px-2 py-1 rounded">
-                          <Wifi className="w-3.5 h-3.5 text-dpc-blue" /> High-Speed Fiber Internet
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-5 pt-0 flex items-center justify-between border-t border-neutral-100 mt-2">
-                  <div>
-                    <span className="text-lg font-bold text-navy">{convertPrice(rental.pricePerNight)}</span>
-                    <span className="text-xs text-text-muted"> / night</span>
-                  </div>
-                  <Link to="/rentals">
-                    <Button size="sm" className="text-xs bg-navy hover:bg-navy-dark">
-                      Book / Inquire
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 8. Advertisers & Verified Partners Section */}
-      <AdvertisersSection showMediaBanner={true} />
-
-      {/* 9. How It Works */}
+      {/* 8. How It Works */}
       <section className="py-20 bg-navy text-white text-center">
         <div className="max-w-7xl mx-auto px-4">
           <SectionHeading title="How Diaspora Point Connect Works" align="center" className="text-white [&>h2]:text-white [&>p]:text-gray-300" />

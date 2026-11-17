@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Search, Menu, X, ChevronDown, Heart, Home, Award, Sparkles, Building2 } from 'lucide-react';
+import { ShoppingCart, User, Search, Menu, X, ChevronDown, Heart, ShieldCheck } from 'lucide-react';
 import { Button, buttonVariants } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import { cn } from '@/src/lib/utils';
 import { useShop } from '@/src/contexts/ShopContext';
+import { PWAInstallButton } from '../pwa/PWAInstallButton';
+import { OfflineIndicator } from '../pwa/OfflineIndicator';
 
 export function CustomerLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -40,44 +42,6 @@ export function CustomerLayout() {
         { name: 'Electronics & Appliances', path: '/shop/category/electronics' },
         { name: 'Made in Kenya', path: '/shop/category/kenya' },
         { name: 'Gift builder', path: '/gift-builder' },
-      ]
-    },
-    { 
-      name: 'Places to Stay', 
-      path: '/places-to-stay',
-      hasDropdown: true,
-      dropdownItems: [
-        { name: 'All Places to Stay', path: '/places-to-stay' },
-        { name: 'Nairobi', path: '/places-to-stay?city=Nairobi' },
-        { name: 'Mombasa', path: '/places-to-stay?city=Mombasa' },
-        { name: 'Naivasha', path: '/places-to-stay?city=Naivasha' },
-        { name: 'Diani', path: '/places-to-stay?city=Diani Beach' },
-      ]
-    },
-    { 
-      name: 'Property for Sale', 
-      path: '/property-for-sale',
-      hasDropdown: true,
-      dropdownItems: [
-        { name: 'Verified Apartments', path: '/property-for-sale?type=Apartments' },
-        { name: 'New Developments', path: '/property-for-sale?type=Developments' },
-        { name: 'Apartments by Location', path: '/property-for-sale#locations' },
-        { name: 'View Property', path: '/property-for-sale#listings' },
-        { name: 'Request a Site Visit', path: '/property-for-sale' },
-        { name: 'Property Buying Process', path: '/property-for-sale#process' },
-      ]
-    },
-    { 
-      name: 'Business Directory', 
-      path: '/business-directory',
-      hasDropdown: true,
-      dropdownItems: [
-        { name: 'Verified Businesses', path: '/business-directory' },
-        { name: 'Real Estate & Land', path: '/business-directory?category=real-estate' },
-        { name: 'Banking & Mortgages', path: '/business-directory?category=banking' },
-        { name: 'Construction & Home Services', path: '/business-directory?category=construction' },
-        { name: 'Professional Services', path: '/business-directory?category=professional' },
-        { name: 'Advertise Your Business', path: '/advertise' },
       ]
     },
     { 
@@ -117,41 +81,42 @@ export function CustomerLayout() {
       )}
 
       {/* Top Bar */}
-      <div className="bg-navy text-white py-2 text-sm hidden sm:block">
+      <div className="bg-dpc-blue text-white py-2 text-sm hidden sm:block">
         <div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
-          <span>Connecting Homes, Connecting Lives.</span>
+          <span className="font-medium tracking-tight">Connecting Homes, Connecting Lives.</span>
           <div className="flex items-center space-x-4">
-            <div className="flex items-center border-r border-navy-light pr-4 mr-2">
-              <span className="text-[10px] uppercase font-bold text-gray-400 mr-2">Currency:</span>
+            <div className="flex items-center border-r border-white/20 pr-4 mr-2">
+              <span className="text-[10px] uppercase font-bold text-blue-100 mr-2">Currency:</span>
               <select 
                 className="bg-transparent border-none text-white focus:ring-0 cursor-pointer font-bold text-xs p-0 h-auto"
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value as any)}
               >
-                <option value="USD" className="bg-navy">USD ($)</option>
-                <option value="KES" className="bg-navy">KES (KSh)</option>
-                <option value="GBP" className="bg-navy">GBP (£)</option>
-                <option value="EUR" className="bg-navy">EUR (€)</option>
+                <option value="USD" className="bg-dpc-blue text-white">USD ($)</option>
+                <option value="KES" className="bg-dpc-blue text-white">KES (KSh)</option>
+                <option value="GBP" className="bg-dpc-blue text-white">GBP (£)</option>
+                <option value="EUR" className="bg-dpc-blue text-white">EUR (€)</option>
               </select>
             </div>
-            <Link to="/support" className="hover:text-dpc-yellow transition-colors">Support</Link>
-            <Link to="/track" className="hover:text-dpc-yellow transition-colors">Track Order</Link>
+            <Link to="/support" className="hover:text-dpc-yellow transition-colors font-medium">Support</Link>
+            <Link to="/track" className="hover:text-dpc-yellow transition-colors font-medium">Track Order</Link>
           </div>
         </div>
       </div>
 
       {/* Main Header */}
-      <header className="bg-white border-b border-neutral-border sticky top-0 z-50">
+      <header className="bg-dpc-yellow text-navy border-b border-dpc-yellow-dark shadow-xs sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
           <div className="flex items-center space-x-4 lg:w-auto lg:shrink-0">
             <button 
-              className="lg:hidden p-2 -ml-2 text-navy hover:text-dpc-blue"
+              className="lg:hidden p-2 -ml-2 text-navy hover:text-dpc-blue-dark transition-colors"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle Menu"
             >
               {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
-            <Link to="/" className="flex items-center space-x-2" onClick={() => setIsMobileMenuOpen(false)}>
-              <img src="/logo.png" alt="Diaspora Point Connect" className="h-10 md:h-12 object-contain" onError={(e) => {
+            <Link to="/" className="flex items-center space-x-2 bg-white px-2.5 py-1 rounded-lg shadow-xs shrink-0" onClick={() => setIsMobileMenuOpen(false)}>
+              <img src="/logo.png" alt="Diaspora Point Connect" className="h-9 md:h-11 object-contain" onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.onerror = null;
                 target.style.display = 'none';
@@ -171,7 +136,7 @@ export function CustomerLayout() {
                     to={link.path} 
                     className={cn(
                       "font-semibold transition-colors flex items-center text-xs xl:text-sm whitespace-nowrap py-2 tracking-tight",
-                      isActive ? "text-dpc-blue font-bold" : "text-navy group-hover:text-dpc-blue"
+                      isActive ? "text-navy font-bold underline decoration-2 underline-offset-4" : "text-navy/90 group-hover:text-dpc-blue-dark"
                     )}
                   >
                     <span>{link.name}</span>
@@ -198,28 +163,31 @@ export function CustomerLayout() {
           </nav>
 
           <div className="flex items-center justify-end space-x-2 sm:space-x-4 lg:w-auto lg:shrink-0">
+            <div className="hidden md:block">
+              <PWAInstallButton />
+            </div>
             <button 
               onClick={() => setIsSearchOpen(true)}
-              className="p-2 text-navy hover:text-dpc-blue transition-colors"
+              className="p-2 text-navy hover:text-dpc-blue-dark transition-colors"
               aria-label="Search"
             >
               <Search className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
-            <Link to="/account?tab=wishlist" className="p-2 text-navy hover:text-dpc-blue transition-colors hidden sm:block relative" title="View Wishlist">
+            <Link to="/account?tab=wishlist" className="p-2 text-navy hover:text-dpc-blue-dark transition-colors hidden sm:block relative" title="View Wishlist">
               <Heart className="h-5 w-5 sm:h-6 sm:w-6" />
               {wishlist.length > 0 && (
-                <span className="absolute top-0 right-0 bg-dpc-yellow text-navy text-[10px] sm:text-xs font-bold h-4 w-4 rounded-full flex items-center justify-center">
+                <span className="absolute top-0 right-0 bg-navy text-dpc-yellow text-[10px] sm:text-xs font-bold h-4 w-4 rounded-full flex items-center justify-center">
                   {wishlist.length}
                 </span>
               )}
             </Link>
-            <Link to="/account" className="p-2 text-navy hover:text-dpc-blue transition-colors hidden sm:block">
+            <Link to="/account" className="p-2 text-navy hover:text-dpc-blue-dark transition-colors hidden sm:block" aria-label="My Account">
               <User className="h-6 w-6" />
             </Link>
-            <Link to="/cart" className="p-2 text-navy hover:text-dpc-blue transition-colors relative">
+            <Link to="/cart" className="p-2 text-navy hover:text-dpc-blue-dark transition-colors relative" aria-label="Shopping Cart">
               <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
               {cartCount > 0 && (
-                <span className="absolute top-0 right-0 bg-dpc-yellow text-navy text-[10px] sm:text-xs font-bold h-4 w-4 rounded-full flex items-center justify-center">
+                <span className="absolute top-0 right-0 bg-navy text-dpc-yellow text-[10px] sm:text-xs font-bold h-4 w-4 rounded-full flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
@@ -338,91 +306,49 @@ export function CustomerLayout() {
       </header>
 
       {/* Sub-Navigation Bar */}
-      <div className="bg-neutral-50/95 border-b border-neutral-200 sticky top-20 z-40 backdrop-blur-xs">
+      <div className="bg-white/95 border-b border-neutral-200 sticky top-20 z-40 backdrop-blur-xs">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between text-xs py-2 font-medium">
           <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 overflow-x-auto scrollbar-none py-0.5 w-full lg:w-auto">
             <Link 
-              to="/places-to-stay" 
-              className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all whitespace-nowrap",
-                location.pathname.startsWith('/places-to-stay') || location.pathname.startsWith('/rentals')
-                  ? "bg-emerald-600 text-white shadow-xs"
-                  : "bg-white text-navy border border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
-              )}
-            >
-              <Home className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Places to Stay</span>
-              <span className={cn("text-[10px] font-bold px-1.5 py-0.2 rounded-full", location.pathname.startsWith('/places-to-stay') || location.pathname.startsWith('/rentals') ? "bg-white/25 text-white" : "bg-emerald-100 text-emerald-800")}>Verified</span>
-            </Link>
-
-            <Link 
-              to="/property-for-sale" 
-              className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all whitespace-nowrap",
-                location.pathname.startsWith('/property-for-sale')
-                  ? "bg-navy text-white shadow-xs"
-                  : "bg-white text-navy border border-blue-300 hover:bg-blue-50 hover:text-navy"
-              )}
-            >
-              <Building2 className="w-3.5 h-3.5 text-dpc-blue" />
-              <span>Property for Sale</span>
-            </Link>
-
-            <Link 
-              to="/business-directory" 
-              className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all whitespace-nowrap",
-                location.pathname.startsWith('/business-directory')
-                  ? "bg-amber-600 text-white shadow-xs"
-                  : "bg-white text-navy border border-amber-300 hover:bg-amber-50 hover:text-navy"
-              )}
-            >
-              <Award className="w-3.5 h-3.5 text-amber-500" />
-              <span>Business Directory</span>
-            </Link>
-
-            <div className="h-4 w-px bg-neutral-300 mx-1 shrink-0 hidden sm:block" />
-
-            <Link 
               to="/shop/category/gifts" 
-              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/gifts' ? "text-dpc-blue font-bold bg-white" : "text-text-muted hover:text-navy")}
+              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/gifts' ? "text-dpc-blue font-bold bg-blue-50" : "text-text-muted hover:text-navy")}
             >
               Gifts & Hampers
             </Link>
             <Link 
               to="/shop/category/flowers" 
-              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/flowers' ? "text-dpc-blue font-bold bg-white" : "text-text-muted hover:text-navy")}
+              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/flowers' ? "text-dpc-blue font-bold bg-blue-50" : "text-text-muted hover:text-navy")}
             >
               Flowers & Cakes
             </Link>
             <Link 
               to="/shop/category/groceries" 
-              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/groceries' ? "text-dpc-blue font-bold bg-white" : "text-text-muted hover:text-navy")}
+              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/groceries' ? "text-dpc-blue font-bold bg-blue-50" : "text-text-muted hover:text-navy")}
             >
               Groceries & Essentials
             </Link>
             <Link 
               to="/shop/category/electronics" 
-              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/electronics' ? "text-dpc-blue font-bold bg-white" : "text-text-muted hover:text-navy")}
+              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/electronics' ? "text-dpc-blue font-bold bg-blue-50" : "text-text-muted hover:text-navy")}
             >
               Electronics & Appliances
             </Link>
             <Link 
               to="/shop/category/kenya" 
-              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/kenya' ? "text-dpc-blue font-bold bg-white" : "text-text-muted hover:text-navy")}
+              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/shop/category/kenya' ? "text-dpc-blue font-bold bg-blue-50" : "text-text-muted hover:text-navy")}
             >
               Made in Kenya
             </Link>
             <Link 
               to="/gift-builder" 
-              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/gift-builder' ? "text-dpc-blue font-bold bg-white" : "text-text-muted hover:text-navy")}
+              className={cn("px-2.5 py-1 rounded-md transition-colors whitespace-nowrap", location.pathname === '/gift-builder' ? "text-dpc-blue font-bold bg-blue-50" : "text-text-muted hover:text-navy")}
             >
               Gift Builder
             </Link>
           </div>
 
-          <div className="hidden xl:flex items-center gap-2 text-text-muted text-[11px] shrink-0 pl-4">
-            <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+          <div className="hidden xl:flex items-center gap-1.5 text-text-muted text-[11px] shrink-0 pl-4">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
             <span>PesaPal, M-Pesa & Card Secured</span>
           </div>
         </div>
@@ -433,49 +359,42 @@ export function CustomerLayout() {
         <Outlet />
       </main>
 
+      <OfflineIndicator />
+
       {/* Footer */}
       <footer className="bg-navy-dark text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-5 gap-8">
+        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="md:col-span-2">
             <img src="/logo.png" alt="DPC" className="h-10 object-contain mb-6 bg-white p-1 rounded" onError={(e) => e.currentTarget.style.display = 'none'} />
-            <p className="text-gray-400 text-sm max-w-sm mb-4">Connecting diaspora to their loved ones back home in Kenya with verified gifting, curated places to stay, and title-deed safe property investments.</p>
-            <div className="flex items-center gap-3 text-xs text-gray-400">
-              <Link to="/about" className="hover:text-white underline">About Us</Link>
+            <p className="text-gray-200 text-sm max-w-sm mb-4">Connecting diaspora to their loved ones back home in Kenya with verified gifting and essential groceries.</p>
+            <div className="flex items-center gap-3 text-xs text-gray-200">
+              <Link to="/about" className="hover:text-dpc-yellow underline transition-colors">About Us</Link>
               <span>•</span>
-              <Link to="/about#how-it-works" className="hover:text-white underline">How It Works</Link>
+              <Link to="/about#how-it-works" className="hover:text-dpc-yellow underline transition-colors">How It Works</Link>
               <span>•</span>
-              <Link to="/about#contact" className="hover:text-white underline">Contact</Link>
+              <Link to="/about#contact" className="hover:text-dpc-yellow underline transition-colors">Contact</Link>
             </div>
           </div>
           <div>
-            <h4 className="font-display font-semibold mb-4 text-base">Shop</h4>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li><Link to="/shop/category/gifts" className="hover:text-white transition-colors">Gifts & Hampers</Link></li>
-              <li><Link to="/shop/category/flowers" className="hover:text-white transition-colors">Flowers & Cakes</Link></li>
-              <li><Link to="/shop/category/groceries" className="hover:text-white transition-colors">Groceries & Essentials</Link></li>
-              <li><Link to="/shop/category/electronics" className="hover:text-white transition-colors">Electronics & Appliances</Link></li>
-              <li><Link to="/shop/category/kenya" className="hover:text-white transition-colors">Made in Kenya</Link></li>
-              <li><Link to="/gift-builder" className="hover:text-white transition-colors">Gift Builder</Link></li>
+            <h4 className="font-display font-bold text-dpc-yellow mb-4 text-base tracking-wide">Shop</h4>
+            <ul className="space-y-2 text-sm text-gray-200">
+              <li><Link to="/shop/category/gifts" className="hover:text-dpc-yellow transition-colors">Gifts &amp; Hampers</Link></li>
+              <li><Link to="/shop/category/flowers" className="hover:text-dpc-yellow transition-colors">Flowers &amp; Cakes</Link></li>
+              <li><Link to="/shop/category/groceries" className="hover:text-dpc-yellow transition-colors">Groceries &amp; Essentials</Link></li>
+              <li><Link to="/shop/category/electronics" className="hover:text-dpc-yellow transition-colors">Electronics &amp; Appliances</Link></li>
+              <li><Link to="/shop/category/kenya" className="hover:text-dpc-yellow transition-colors">Made in Kenya</Link></li>
+              <li><Link to="/gift-builder" className="hover:text-dpc-yellow transition-colors">Gift Builder</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="font-display font-semibold mb-4 text-base">Services & Property</h4>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li><Link to="/places-to-stay" className="hover:text-white transition-colors flex items-center gap-1.5"><span className="text-emerald-400">●</span> Places to Stay</Link></li>
-              <li><Link to="/property-for-sale" className="hover:text-white transition-colors">Property for Sale</Link></li>
-              <li><Link to="/business-directory" className="hover:text-white transition-colors">Business Directory</Link></li>
-              <li><Link to="/advertise" className="hover:text-white transition-colors">Advertise Your Business</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-display font-semibold mb-4 text-base">Customer Care</h4>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li><Link to="/track" className="hover:text-white transition-colors">Track Order</Link></li>
-              <li><Link to="/support" className="hover:text-white transition-colors">Support Concierge</Link></li>
-              <li><Link to="/faq" className="hover:text-white transition-colors">FAQ & Payments</Link></li>
-              <li><Link to="/shipping" className="hover:text-white transition-colors">Shipping Coverage</Link></li>
-              <li><Link to="/returns" className="hover:text-white transition-colors">Returns Policy</Link></li>
-              <li><Link to="/admin" className="text-dpc-yellow hover:underline">Admin Login</Link></li>
+            <h4 className="font-display font-bold text-dpc-yellow mb-4 text-base tracking-wide">Customer Care</h4>
+            <ul className="space-y-2 text-sm text-gray-200">
+              <li><Link to="/track" className="hover:text-dpc-yellow transition-colors">Track Order</Link></li>
+              <li><Link to="/support" className="hover:text-dpc-yellow transition-colors">Support Concierge</Link></li>
+              <li><Link to="/faq" className="hover:text-dpc-yellow transition-colors">FAQ &amp; Payments</Link></li>
+              <li><Link to="/shipping" className="hover:text-dpc-yellow transition-colors">Shipping Coverage</Link></li>
+              <li><Link to="/returns" className="hover:text-dpc-yellow transition-colors">Returns Policy</Link></li>
+              <li><Link to="/admin" className="text-dpc-yellow font-semibold hover:underline">Admin Login</Link></li>
             </ul>
           </div>
         </div>

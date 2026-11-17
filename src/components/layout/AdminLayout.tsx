@@ -22,7 +22,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Info,
-  Building2
+  Database
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { Button } from '@/src/components/ui/Button';
@@ -40,13 +40,12 @@ const navGroups = [
     items: [
       { name: 'Sales & Orders', path: '/admin/sales', icon: ShoppingBag },
       { name: 'Catalog', path: '/admin/catalog', icon: Package },
-      { name: 'Properties', path: '/admin/properties', icon: Building2 },
       { name: 'Inventory', path: '/admin/inventory', icon: Box },
       { name: 'Logistics', path: '/admin/logistics', icon: Truck },
     ]
   },
   {
-    category: 'Partners & Customers',
+    category: 'Customers & Marketing',
     items: [
       { name: 'Suppliers', path: '/admin/suppliers', icon: Briefcase },
       { name: 'Customers', path: '/admin/customers', icon: Users },
@@ -65,6 +64,7 @@ const navGroups = [
     items: [
       { name: 'Analytics', path: '/admin/analytics', icon: BarChart },
       { name: 'Settings', path: '/admin/settings', icon: Settings },
+      { name: 'Database Setup', path: '/admin/migration', icon: Database, superOnly: true },
     ]
   }
 ];
@@ -74,7 +74,7 @@ const allNavItems = navGroups.flatMap(g => g.items);
 export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, login, logout } = useAuth();
+  const { currentUser, login, logout, hasRole } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [readNotifications, setReadNotifications] = useState<string[]>([]);
@@ -86,7 +86,7 @@ export function AdminLayout() {
   const mockAdminAlerts = [
     { id: 'al-1', title: 'Pending Driver Assignment', text: 'Order #DPC-849201 in Nairobi is packed and ready for dispatch.', type: 'urgent', time: '10m ago' },
     { id: 'al-2', title: 'Low Stock Warning', text: 'Belgian Chocolate Cake inventory reached threshold (5 units left).', type: 'warning', time: '1h ago' },
-    { id: 'al-3', title: 'Diaspora Advertiser Verified', text: 'Equity Bank Diaspora Mortgages profile is active.', type: 'info', time: '3h ago' },
+    { id: 'al-3', title: 'New Gift Order Confirmed', text: 'Order #DPC-849205 for Nakuru Express is queued for dispatch.', type: 'info', time: '3h ago' },
   ];
 
   const unreadCount = mockAdminAlerts.filter(a => !readNotifications.includes(a.id)).length;
@@ -163,6 +163,7 @@ export function AdminLayout() {
                   {group.category}
                 </div>
                 {group.items.map((item) => {
+                  if ((item as any).superOnly && !hasRole('SUPER_ADMIN')) return null;
                   const isActive = location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(`${item.path}/`));
                   return (
                     <Link

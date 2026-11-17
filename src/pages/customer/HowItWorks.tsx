@@ -28,7 +28,7 @@ export default function HowItWorks() {
             How <span className="text-dpc-yellow">Diaspora Point Connect</span> Works
           </h1>
           <p className="text-lg text-gray-300 max-w-2xl mx-auto leading-relaxed">
-            From ordering birthday flowers for mum in Nairobi to verifying a new apartment development, here is how our verified ecosystem safeguards your transactions every step of the way.
+            From ordering birthday flowers for mum in Nairobi to sending monthly family groceries, here is how our verified ecosystem safeguards your transactions every step of the way.
           </p>
         </div>
       </section>
@@ -85,18 +85,18 @@ export default function HowItWorks() {
           </div>
         </div>
 
-        {/* 2. Places to Stay Flow */}
+        {/* 2. Family Support & Groceries Flow */}
         <div className="bg-white p-8 md:p-12 rounded-3xl border border-neutral-200 shadow-sm">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8 pb-6 border-b border-neutral-100">
             <div>
               <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Service Flow 2</span>
               <h2 className="text-2xl md:text-3xl font-display font-bold text-navy">
-                Booking Verified Places to Stay & Rentals
+                Supporting Family with Monthly Groceries & Essentials
               </h2>
             </div>
-            <Link to="/places-to-stay">
+            <Link to="/shop/category/family-support">
               <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs">
-                Explore Rentals <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                Explore Family Support <ArrowRight className="w-3.5 h-3.5 ml-1" />
               </Button>
             </Link>
           </div>
@@ -105,23 +105,23 @@ export default function HowItWorks() {
             {[
               {
                 step: '1',
-                title: 'Pick Location & Dates',
-                desc: 'Filter verified homes in Nairobi, Mombasa, Naivasha, or Diani with guaranteed power generator backup.'
+                title: 'Choose Essential Bundles',
+                desc: 'Pick pantry staples, fresh produce, household appliances, or educational packs tailored for your family.'
               },
               {
                 step: '2',
-                title: 'Review Verified Amenities',
-                desc: 'Confirm 100 Mbps WiFi speed tests, biometric security, and optional private chef or airport pickup.'
+                title: 'Set Recipient Details',
+                desc: 'Provide your loved one’s Kenyan phone number and county delivery zone across all 47 counties.'
               },
               {
                 step: '3',
-                title: 'Direct Superhost Connection',
-                desc: 'Instant booking inquiry with transparent pricing and zero inflated surprise checkout fees.'
+                title: 'Transparent Checkout',
+                desc: 'Pay in USD, KES, GBP, or EUR with instant PesaPal protection and zero middlemen diversion.'
               },
               {
                 step: '4',
-                title: 'Airport Meet & Keyless Check-in',
-                desc: 'Arrive at JKIA or Moi International with optional chauffeur and seamless keyless door code entry.'
+                title: 'Doorstep Delivery & Photo Proof',
+                desc: 'Our local dispatch officers coordinate directly and send delivery confirmation straight to you.'
               }
             ].map((s, idx) => (
               <div key={idx} className="bg-neutral-50 p-6 rounded-2xl border border-neutral-100 relative">
@@ -135,18 +135,18 @@ export default function HowItWorks() {
           </div>
         </div>
 
-        {/* 3. Verified Property for Sale Flow */}
+        {/* 3. Custom Gift Box Builder Flow */}
         <div className="bg-white p-8 md:p-12 rounded-3xl border border-neutral-200 shadow-sm">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8 pb-6 border-b border-neutral-100">
             <div>
               <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">Service Flow 3</span>
               <h2 className="text-2xl md:text-3xl font-display font-bold text-navy">
-                Buying Verified Property in Kenya
+                Building a Custom Personalized Gift Box
               </h2>
             </div>
-            <Link to="/property-for-sale">
+            <Link to="/gift-builder">
               <Button size="sm" className="bg-navy hover:bg-navy-light text-white text-xs">
-                View Properties <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                Start Building <ArrowRight className="w-3.5 h-3.5 ml-1" />
               </Button>
             </Link>
           </div>
@@ -155,23 +155,23 @@ export default function HowItWorks() {
             {[
               {
                 step: '1',
-                title: 'ArdhiSasa Pre-Screened',
-                desc: 'Every apartment and development undergoes title search, zoning review, and NCA permit check before listing.'
+                title: 'Choose Basket & Theme',
+                desc: 'Select a keepsake hamper basket or luxury gift box tailored to your loved one’s celebration.'
               },
               {
                 step: '2',
-                title: 'Proxy Site Inspection',
-                desc: 'Book a live video site inspection or send a trusted proxy accompanied by an independent DPC inspector.'
+                title: 'Pick Treats & Keepsakes',
+                desc: 'Mix and match artisan Kenyan coffee, chocolates, fresh flowers, skincare, or wellness items.'
               },
               {
                 step: '3',
-                title: 'Regulated Escrow Deposit',
-                desc: '10% deposit held securely in an independent advocate escrow account with clear release criteria.'
+                title: 'Add Card or Video Note',
+                desc: 'Include a custom printed greeting card or personalized dedication message for their big moment.'
               },
               {
                 step: '4',
-                title: 'Title Registration & Handover',
-                desc: 'Stamp duty execution, sectional title registration, and safe international delivery or tenant placement.'
+                title: 'Wrapped & Hand-Delivered',
+                desc: 'Our team carefully packs, wraps, and delivers your custom hamper anywhere across Kenya.'
               }
             ].map((s, idx) => (
               <div key={idx} className="bg-neutral-50 p-6 rounded-2xl border border-neutral-100 relative">
@@ -211,8 +211,8 @@ export default function HowItWorks() {
                 a: 'Yes! We deliver across Nairobi, Kiambu, Machakos, Nakuru, Mombasa, Kisumu, Eldoret, and Naivasha. Delivery zone options are selectable at checkout.'
               },
               {
-                q: 'How do you verify properties and developers?',
-                a: 'Our property legal desk conducts official searches on the Kenyan Ministry of Lands digital portal (ArdhiSasa), inspects physical construction milestones, and requires regulated lawyer escrow accounts.'
+                q: 'How do I know my gift was delivered safely?',
+                a: 'Every order includes real-time milestone tracking and high-resolution photo confirmation sent to your dashboard and email upon handover.'
               }
             ].map((faq, i) => (
               <div key={i} className="p-6 rounded-2xl bg-neutral-50 border border-neutral-100">

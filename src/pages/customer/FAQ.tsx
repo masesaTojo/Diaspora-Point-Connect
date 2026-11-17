@@ -17,7 +17,7 @@ import { Button } from '@/src/components/ui/Button';
 interface FAQItem {
   question: string;
   answer: string;
-  category: 'payments' | 'delivery' | 'orders' | 'rentals';
+  category: 'payments' | 'delivery' | 'orders';
 }
 
 export default function FAQ() {
@@ -70,16 +70,6 @@ export default function FAQ() {
       category: 'orders',
       question: 'How can I track my order once placed?',
       answer: 'You will receive an instant confirmation email and order tracking code. You can use our "Track Order" link in the top navigation to view live milestones from confirmation to Nairobi packaging, driver dispatch, and final delivery.'
-    },
-    {
-      category: 'rentals',
-      question: 'How do House Rentals work for diaspora returning to Kenya?',
-      answer: 'Our House Rentals section lists verified serviced apartments, beach villas, and holiday homes across Nairobi, Mombasa, Diani, and Naivasha. You can filter by backup generators (ensuring no power outage interruptions), high-speed Wi-Fi, and private pools, and submit booking requests directly.'
-    },
-    {
-      category: 'rentals',
-      question: 'Can I list my own property in Kenya on the platform?',
-      answer: 'Yes! Kenyan property owners and hosts can submit their serviced stays via the "List Your Property" button in the House Rentals page. Our local team conducts a verification inspection before featuring your listing.'
     }
   ];
 
@@ -113,7 +103,7 @@ export default function FAQ() {
           <Search className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
           <input 
             type="text"
-            placeholder="Search questions (e.g. currency, PesaPal, delivery, tracking, rentals)..."
+            placeholder="Search questions (e.g. currency, PesaPal, delivery, tracking)..."
             className="w-full pl-12 pr-4 py-3.5 bg-white border border-neutral-300 rounded-xl focus:ring-2 focus:ring-dpc-blue text-navy placeholder:text-gray-400 font-medium shadow-xs"
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
@@ -126,8 +116,7 @@ export default function FAQ() {
             { id: 'all', label: 'All Questions' },
             { id: 'payments', label: 'Payments & Currency' },
             { id: 'delivery', label: 'Delivery in Kenya' },
-            { id: 'orders', label: 'Orders & Gifting' },
-            { id: 'rentals', label: 'House Rentals' }
+            { id: 'orders', label: 'Orders & Gifting' }
           ].map(cat => (
             <button
               key={cat.id}

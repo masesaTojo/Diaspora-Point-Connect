@@ -69,7 +69,7 @@ export default function Support() {
               <HelpCircle className="w-5 h-5" />
             </div>
             <h3 className="font-bold text-navy text-base mb-1">FAQs & Policies</h3>
-            <p className="text-xs text-text-muted mb-2">Answers regarding payments, delivery zones & rentals.</p>
+            <p className="text-xs text-text-muted mb-2">Answers regarding payments, delivery zones & gifting.</p>
             <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">Read FAQs <ArrowRight className="w-3.5 h-3.5" /></span>
           </Link>
 
@@ -205,7 +205,6 @@ export default function Support() {
                       <option value="Order Tracking & Delivery Status">Order Tracking & Delivery Status</option>
                       <option value="Reschedule / Change Recipient Details">Reschedule / Change Recipient Details</option>
                       <option value="PesaPal / Card / Payment Support">PesaPal / Card / Payment Support</option>
-                      <option value="House Rentals Inquiry">House Rentals Inquiry in Kenya</option>
                       <option value="Custom Gift Box Request">Custom Gift Box Request</option>
                       <option value="Corporate / Diaspora Group Order">Corporate / Diaspora Group Order</option>
                       <option value="Other">Other Question</option>

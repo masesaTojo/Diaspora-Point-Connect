@@ -1,0 +1,108 @@
+{
+  "entities": {
+    "Category": {
+      "title": "Category",
+      "description": "Product categories",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "parentId": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "name", "slug", "isActive"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "E-commerce products",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "primaryCategoryId": { "type": "string" },
+        "price": { "type": "number" },
+        "salePrice": { "type": "number" },
+        "inventory": { "type": "number" },
+        "status": { "type": "string", "enum": ["DRAFT", "ACTIVE", "ARCHIVED"] },
+        "images": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "slug", "price", "status"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer orders",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerId": { "type": "string" },
+        "status": { "type": "string" },
+        "total": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "status", "total", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "Internal admin audit logs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "action", "timestamp"]
+    },
+    "DeliveryZone": {
+      "title": "Delivery Zone",
+      "description": "Shipping zones and fees",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "fee": { "type": "number" }
+      },
+      "required": ["id", "name", "fee"]
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "Discount codes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "discountValue": { "type": "number" }
+      },
+      "required": ["id", "code", "discountValue"]
+    },
+    "CmsSection": {
+      "title": "CMS Section",
+      "description": "Dynamic homepage sections",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["id", "type", "order"]
+    }
+  },
+  "firestore": {
+    "categories": { "schema": "Category", "description": "Product categories" },
+    "products": { "schema": "Product", "description": "E-commerce products" },
+    "orders": { "schema": "Order", "description": "Customer orders" },
+    "auditLogs": { "schema": "AuditLog", "description": "System audit logs" },
+    "deliveryZones": { "schema": "DeliveryZone", "description": "Shipping zones" },
+    "coupons": { "schema": "Coupon", "description": "Discount codes" },
+    "cmsSections": { "schema": "CmsSection", "description": "Homepage sections" },
+    "giftConfig": { "schema": "object", "description": "Gift builder configuration" },
+    "users": { "schema": "object", "description": "User profiles" }
+  }
+}

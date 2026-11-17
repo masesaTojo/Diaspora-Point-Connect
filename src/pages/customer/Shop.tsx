@@ -177,25 +177,6 @@ export default function Shop() {
                     </li>
                   ))}
                 </ul>
-
-                {/* Stays & Partner Services Sub-nav */}
-                <div className="mt-6 pt-4 border-t border-neutral-border">
-                  <h4 className="font-semibold text-xs text-navy uppercase tracking-wider mb-2">Accommodations & Services</h4>
-                  <ul className="space-y-2 text-sm">
-                    <li>
-                      <Link to="/rentals" className="flex items-center gap-1.5 text-text hover:text-emerald-600 transition-colors">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        <span>House Rentals in Kenya</span>
-                      </Link>
-                    </li>
-                    <li>
-                      <Link to="/advertise" className="flex items-center gap-1.5 text-text hover:text-dpc-blue transition-colors">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                        <span>Verified Advertisers</span>
-                      </Link>
-                    </li>
-                  </ul>
-                </div>
               </div>
 
               {/* Price Filter */}

@@ -13,8 +13,6 @@ import {
   Sparkles, 
   Users, 
   Globe2, 
-  Building2, 
-  Home, 
   Send, 
   MessageSquare,
   ArrowRight
@@ -50,7 +48,7 @@ export default function AboutUs() {
             Connecting Homes, Connecting Lives.
           </h1>
           <p className="text-blue-100 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Bridging the miles between the Kenyan diaspora and loved ones back home through verified gifting, vetted places to stay, and transparent property investments.
+            Bridging the miles between the Kenyan diaspora and loved ones back home through verified gifting, fresh flowers & cakes, and essential groceries.
           </p>
         </div>
       </div>
@@ -66,10 +64,10 @@ export default function AboutUs() {
                 Built by Diaspora, for Diaspora
               </h2>
               <p className="text-text-muted text-sm md:text-base leading-relaxed mb-4">
-                Millions of Kenyans living in the United States, United Kingdom, Canada, Europe, Australia, and the Gulf send love and support back home every single day. Yet, for too long, this came with anxiety: items arriving late, wilted flowers, middlemen markup, or property deals that lacked verified title deeds.
+                Millions of Kenyans living in the United States, United Kingdom, Canada, Europe, Australia, and the Gulf send love and support back home every single day. Yet, for too long, this came with anxiety: items arriving late, wilted flowers, middlemen markup, or unreliable delivery channels.
               </p>
               <p className="text-text-muted text-sm md:text-base leading-relaxed mb-6">
-                Diaspora Point Connect was created to eliminate this gap. We combine localized on-the-ground Kenyan logistics with bank-grade international payment gateways (PesaPal) and verified local partnerships to give you absolute peace of mind.
+                Diaspora Point Connect was created to eliminate this gap. We combine localized on-the-ground Kenyan logistics with bank-grade international payment gateways (PesaPal) and vetted fulfillment hubs to give you absolute peace of mind.
               </p>
 
               <div className="grid grid-cols-2 gap-4 text-xs font-bold text-navy">
@@ -87,7 +85,7 @@ export default function AboutUs() {
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>100% Title-Verified Property</span>
+                  <span>Photo Proof Delivery</span>
                 </div>
               </div>
             </div>
@@ -150,22 +148,22 @@ export default function AboutUs() {
             <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-4">
-                  <Home className="w-6 h-6" />
+                  <Truck className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-bold text-purple-600 uppercase tracking-wider">02. Places to Stay</span>
-                <h3 className="font-bold text-navy text-xl mt-1 mb-2">Verified Homecoming Stays</h3>
+                <span className="text-xs font-bold text-purple-600 uppercase tracking-wider">02. Family Support</span>
+                <h3 className="font-bold text-navy text-xl mt-1 mb-2">Groceries & Essentials Delivered</h3>
                 <p className="text-xs text-text-muted leading-relaxed mb-4">
-                  Heading home for holidays or family reunions? Book verified serviced apartments, beachfront villas, and holiday cottages with zero blackout risk.
+                  Support parents and family members back home with curated household groceries, appliances, and authentic Kenyan products delivered right to their doorstep.
                 </p>
                 <ul className="text-xs text-text-muted space-y-1.5 mb-6">
-                  <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Automatic generator power backup guaranteed</li>
-                  <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> High-speed Safaricom fiber Wi-Fi</li>
-                  <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Handpicked in Nairobi, Mombasa, Naivasha & Diani</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Direct-to-door delivery with photo confirmation</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Fair local market pricing with zero middlemen</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Coverage across Nairobi, Mombasa, Nakuru & beyond</li>
                 </ul>
               </div>
-              <Link to="/rentals">
+              <Link to="/shop/category/family-support">
                 <Button variant="outline" size="sm" className="w-full text-xs font-bold">
-                  View Places to Stay
+                  Explore Family Support
                 </Button>
               </Link>
             </div>
@@ -174,22 +172,22 @@ export default function AboutUs() {
             <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
-                  <Building2 className="w-6 h-6" />
+                  <Sparkles className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">03. Property & Business</span>
-                <h3 className="font-bold text-navy text-xl mt-1 mb-2">Invest in Kenya Safely</h3>
+                <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">03. Custom Gift Builder</span>
+                <h3 className="font-bold text-navy text-xl mt-1 mb-2">Build Personalized Hampers</h3>
                 <p className="text-xs text-text-muted leading-relaxed mb-4">
-                  Access title-deed verified developments and connect with licensed diaspora mortgage banks, construction suppliers, and legal advocates.
+                  Curate your own custom hamper by picking a gift box, adding chocolates, Kenyan teas, gourmet treats, and a heartfelt message.
                 </p>
                 <ul className="text-xs text-text-muted space-y-1.5 mb-6">
-                  <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Schedule family / representative site visits</li>
-                  <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Clean Lands Registry due diligence certificates</li>
-                  <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Milestone-based escrow payment security</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Handpicked artisan & luxury treats</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Printed greeting cards & ribbon wrap</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Real-time delivery tracking & photo proof</li>
                 </ul>
               </div>
-              <Link to="/property-for-sale">
+              <Link to="/gift-builder">
                 <Button variant="outline" size="sm" className="w-full text-xs font-bold">
-                  Browse Properties for Sale
+                  Start Building a Gift
                 </Button>
               </Link>
             </div>
@@ -206,7 +204,7 @@ export default function AboutUs() {
               <span className="text-xs font-bold text-dpc-blue uppercase tracking-wider block mb-2">Direct Concierge Assistance</span>
               <h2 className="text-3xl font-display font-bold text-navy mb-4">Contact Us</h2>
               <p className="text-sm text-text-muted mb-6 leading-relaxed">
-                Whether you have an inquiry about a custom hamper order, need to coordinate a property site inspection, or want to list a rental stay, our Nairobi team is ready to assist.
+                Whether you have an inquiry about a custom hamper order or need help tracking a family delivery, our Nairobi team is ready to assist.
               </p>
 
               <div className="space-y-4 mb-8">
@@ -339,9 +337,6 @@ export default function AboutUs() {
                       className="w-full px-3 py-2 bg-white border border-neutral-300 rounded-xl text-xs"
                     >
                       <option value="Gift Order & Tracking">Gift Order & Tracking Inquiry</option>
-                      <option value="Places to Stay / Rentals">Places to Stay / Booking Inquiry</option>
-                      <option value="Property for Sale & Site Visit">Property for Sale & Site Visit Inquiry</option>
-                      <option value="Business Directory & Advertising">Business Directory & Advertising</option>
                       <option value="PesaPal Payments & Invoices">PesaPal Payments & Invoices</option>
                       <option value="General Inquiry">General Inquiry</option>
                     </select>
