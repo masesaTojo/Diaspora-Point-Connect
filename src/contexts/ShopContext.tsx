@@ -126,7 +126,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const fetchRates = async () => {
       try {
-        const res = await fetch('https://open.er-api.com/v6/latest/USD');
+        const res = await fetch('/api/fx-rates');
         if (res.ok) {
           const data = await res.json();
           if (data?.rates?.KES && data?.rates?.GBP && data?.rates?.EUR) {
@@ -136,10 +136,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
               GBP: Number(data.rates.GBP),
               EUR: Number(data.rates.EUR),
             });
+            return;
           }
         }
       } catch (error) {
-        console.error('Failed to fetch live FX rates, using baseline fallback', error);
+        console.warn('Server FX endpoint unavailable, using baseline rates:', error);
       }
     };
     fetchRates();

@@ -311,3 +311,35 @@ export interface PaymentTransaction {
   createdAt: string;
   updatedAt: string;
 }
+
+export type SupportTicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+
+export interface SupportTicket {
+  id: string;
+  customerId?: string;
+  name: string;
+  email: string;
+  phone?: string;
+  country?: string;
+  orderId?: string;
+  subject: string;
+  message: string;
+  source?: "SUPPORT_PAGE" | "CONTACT_PAGE" | "ABOUT_PAGE";
+  status: SupportTicketStatus;
+  resolutionNote?: string;
+  assignedToEmail?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductReview {
+  id: string;
+  productId: string;
+  userId: string;
+  userName: string;
+  rating: number;
+  comment: string;
+  verifiedPurchase?: boolean;
+  createdAt: string;
+}
+

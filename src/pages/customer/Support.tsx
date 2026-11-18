@@ -15,13 +15,21 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { auth, db } from '@/src/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { buildFirestoreErrorInfo, OperationType, stripUndefined } from '@/src/lib/firestoreErrors';
+import { SupportTicket } from '@/src/types';
 
 export default function Support() {
+  const { currentUser } = useAuth();
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [ticketId, setTicketId] = useState('');
   const [form, setForm] = useState({
-    name: '',
-    email: '',
+    name: currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : '',
+    email: currentUser?.email || '',
     phone: '',
     country: 'United States',
     orderId: '',
@@ -29,11 +37,48 @@ export default function Support() {
     message: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const id = 'TICK-' + Math.floor(100000 + Math.random() * 900000);
-    setTicketId(id);
-    setSubmitted(true);
+    setSubmitError(null);
+    if (form.message.trim().length < 5) {
+      setSubmitError('Please provide a brief message (at least 5 characters) so our concierge can assist you.');
+      return;
+    }
+
+    setSubmitting(true);
+    const id = `TICK-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const nowIso = new Date().toISOString();
+    const verifiedUid = auth.currentUser?.emailVerified ? auth.currentUser.uid : undefined;
+
+    const payload: SupportTicket = stripUndefined({
+      id,
+      customerId: verifiedUid,
+      name: form.name.trim().slice(0, 120),
+      email: form.email.trim().slice(0, 254),
+      phone: form.phone.trim() ? form.phone.trim().slice(0, 32) : undefined,
+      country: form.country.trim() ? form.country.trim().slice(0, 80) : undefined,
+      orderId: form.orderId.trim() ? form.orderId.trim().slice(0, 128) : undefined,
+      subject: form.subject.trim().slice(0, 160),
+      message: form.message.trim().slice(0, 3000),
+      source: 'SUPPORT_PAGE',
+      status: 'OPEN',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    }) as SupportTicket;
+
+    try {
+      await setDoc(doc(db, 'supportTickets', id), payload);
+      setTicketId(id);
+      setSubmitted(true);
+    } catch (err) {
+      console.error(
+        'Support ticket submission failed:',
+        JSON.stringify(buildFirestoreErrorInfo(err, OperationType.CREATE, `supportTickets/${id}`))
+      );
+      setSubmitError('Unable to submit your support request right now. Please try WhatsApp support or check again shortly.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -105,30 +150,42 @@ export default function Support() {
             {submitted ? (
               <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center animate-in zoom-in-95">
                 <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-3" />
-                <h3 className="text-xl font-bold text-navy mb-2">Message Received!</h3>
+                <h3 className="text-xl font-bold text-navy mb-2">Support Ticket Created!</h3>
                 <p className="text-sm text-text-muted max-w-md mx-auto mb-4">
-                  Thank you, <strong>{form.name}</strong>. Your inquiry reference ticket is <span className="font-mono font-bold text-navy">{ticketId}</span>. A support agent has received your request and will follow up at <strong>{form.email}</strong>.
+                  Thank you, <strong>{form.name}</strong>. Your persisted ticket reference is <span className="font-mono font-bold text-navy">{ticketId}</span>. A concierge agent will follow up at <strong>{form.email}</strong>.
                 </p>
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    setSubmitted(false);
-                    setForm({
-                      name: '',
-                      email: '',
-                      phone: '',
-                      country: 'United States',
-                      orderId: '',
-                      subject: 'Order Tracking & Delivery Status',
-                      message: ''
-                    });
-                  }}
-                >
-                  Send Another Inquiry
-                </Button>
+                <div className="flex flex-wrap justify-center gap-3">
+                  {currentUser && (
+                    <Link to="/account?tab=tickets">
+                      <Button>View My Support Tickets</Button>
+                    </Link>
+                  )}
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setSubmitted(false);
+                      setForm({
+                        name: currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : '',
+                        email: currentUser?.email || '',
+                        phone: '',
+                        country: 'United States',
+                        orderId: '',
+                        subject: 'Order Tracking & Delivery Status',
+                        message: ''
+                      });
+                    }}
+                  >
+                    Send Another Inquiry
+                  </Button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
+                {submitError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-xs">
+                    {submitError}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-navy uppercase mb-1">Your Full Name *</label>
@@ -224,8 +281,8 @@ export default function Support() {
                   />
                 </div>
 
-                <Button type="submit" size="lg" className="w-full sm:w-auto flex items-center justify-center gap-2">
-                  <Send className="w-4 h-4" /> Submit Inquiry
+                <Button type="submit" size="lg" disabled={submitting} className="w-full sm:w-auto flex items-center justify-center gap-2">
+                  <Send className="w-4 h-4" /> {submitting ? 'Submitting Ticket...' : 'Submit Inquiry'}
                 </Button>
               </form>
             )}

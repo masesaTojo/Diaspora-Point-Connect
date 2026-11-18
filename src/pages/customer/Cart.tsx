@@ -1,14 +1,21 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Trash2, Plus, Minus, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Trash2, Plus, Minus, ArrowRight, AlertTriangle, MapPin } from 'lucide-react';
 import { useShop } from '@/src/contexts/ShopContext';
 import { Button } from '@/src/components/ui/Button';
 
 export default function Cart() {
-  const { cart, products, removeFromCart, updateCartItem, convertPrice } = useShop();
+  const { cart, products, deliveryZones, removeFromCart, updateCartItem, convertPrice } = useShop();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isCancelled = searchParams.get('cancelled') === 'true';
+
+  const activeZones = useMemo(
+    () => deliveryZones.filter((z) => z.isActive !== false),
+    [deliveryZones]
+  );
+
+  const [selectedCity, setSelectedCity] = useState<string>('Nairobi');
 
   const cartItemsWithDetails = cart.map(item => {
     const product = products.find(p => p.id === item.productId);
@@ -16,7 +23,7 @@ export default function Cart() {
       ...item,
       product
     };
-  }).filter(item => item.product); // Filter out any invalid items
+  }).filter(item => item.product);
 
   const hasOutOfStock = cartItemsWithDetails.some(item => 
     item.product?.availability === 'OUT_OF_STOCK' || 
@@ -29,7 +36,11 @@ export default function Cart() {
     return sum + itemTotal + cardCost;
   }, 0);
 
-  const deliveryFee = subtotal > 0 ? 15 : 0; // Simple mock fee
+  const matchedZone =
+    activeZones.find((z) => z.name === selectedCity) ||
+    activeZones.find((z) => z.name === 'Nairobi') ||
+    activeZones[0];
+  const deliveryFee = subtotal > 0 ? (matchedZone?.fee ?? 10) : 0;
   const serviceFee = subtotal > 0 ? 5 : 0;
   const discount = 0;
   const total = subtotal + deliveryFee + serviceFee - discount;
@@ -64,66 +75,80 @@ export default function Cart() {
         <div className="flex flex-col lg:flex-row gap-12">
           {/* Cart Items */}
           <div className="lg:w-2/3 space-y-6">
-            {cartItemsWithDetails.map((item) => (
-              <div key={item.id} className="bg-white rounded-xl border border-neutral-200 p-4 sm:p-6 flex flex-col sm:flex-row gap-6">
-                
-                {/* Product Image */}
-                <div className="w-full sm:w-32 h-32 flex-shrink-0 bg-neutral-100 rounded-lg overflow-hidden border border-neutral-200">
-                  <img 
-                    src={item.product?.images?.[0]} 
-                    alt={item.product?.name} 
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                {/* Details */}
-                <div className="flex-1 flex flex-col">
-                  <div className="flex justify-between items-start mb-2 gap-4">
-                    <Link to={`/product/${item.product?.slug}`} className="hover:text-dpc-blue transition-colors">
-                      <h3 className="font-semibold text-lg text-navy">{item.product?.name}</h3>
-                    </Link>
-                    <div className="font-bold text-navy whitespace-nowrap">
-                      {convertPrice((item.product?.salePrice || item.product?.price || 0) * item.quantity)}
-                    </div>
-                  </div>
+            {cartItemsWithDetails.map((item) => {
+              const maxStock = typeof item.product?.inventory === 'number' ? item.product.inventory : undefined;
+              const atMaxStock = typeof maxStock === 'number' && item.quantity >= maxStock;
+              return (
+                <div key={item.id} className="bg-white rounded-xl border border-neutral-200 p-4 sm:p-6 flex flex-col sm:flex-row gap-6">
                   
-                  {/* Configuration Info */}
-                  <div className="text-sm text-text-muted space-y-1 mb-4">
-                    {item.recipient && <p><span className="font-medium text-navy">For:</span> {item.recipient}</p>}
-                    {item.deliveryDate && <p><span className="font-medium text-navy">Date:</span> {new Date(item.deliveryDate).toLocaleDateString()}</p>}
-                    {item.giftMessage && <p className="italic line-clamp-1">"{item.giftMessage}"</p>}
-                    {item.includeGreetingCard && <p className="text-dpc-blue">+ Premium Greeting Card ({convertPrice(5 * item.quantity)})</p>}
+                  {/* Product Image */}
+                  <div className="w-full sm:w-32 h-32 flex-shrink-0 bg-neutral-100 rounded-lg overflow-hidden border border-neutral-200">
+                    <img 
+                      src={item.product?.images?.[0]} 
+                      alt={item.product?.name} 
+                      className="w-full h-full object-cover"
+                    />
                   </div>
 
-                  {/* Actions */}
-                  <div className="mt-auto flex items-center justify-between">
-                    <div className="flex items-center border border-neutral-300 rounded-md bg-white">
-                      <button 
-                        onClick={() => updateCartItem(item.id, { quantity: Math.max(1, item.quantity - 1) })}
-                        className="p-2 text-navy hover:bg-neutral-100 transition-colors"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <span className="w-8 text-center font-bold text-navy text-sm">{item.quantity}</span>
-                      <button 
-                        onClick={() => updateCartItem(item.id, { quantity: item.quantity + 1 })}
-                        className="p-2 text-navy hover:bg-neutral-100 transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
+                  {/* Details */}
+                  <div className="flex-1 flex flex-col">
+                    <div className="flex justify-between items-start mb-2 gap-4">
+                      <Link to={`/product/${item.product?.slug}`} className="hover:text-dpc-blue transition-colors">
+                        <h3 className="font-semibold text-lg text-navy">{item.product?.name}</h3>
+                      </Link>
+                      <div className="font-bold text-navy whitespace-nowrap">
+                        {convertPrice((item.product?.salePrice || item.product?.price || 0) * item.quantity)}
+                      </div>
+                    </div>
+                    
+                    {/* Configuration Info */}
+                    <div className="text-sm text-text-muted space-y-1 mb-4">
+                      {item.recipient && <p><span className="font-medium text-navy">For:</span> {item.recipient}</p>}
+                      {item.deliveryDate && <p><span className="font-medium text-navy">Date:</span> {new Date(item.deliveryDate).toLocaleDateString()}</p>}
+                      {item.giftMessage && <p className="italic line-clamp-1">"{item.giftMessage}"</p>}
+                      {item.includeGreetingCard && <p className="text-dpc-blue">+ Premium Greeting Card ({convertPrice(5 * item.quantity)})</p>}
+                      {typeof maxStock === 'number' && maxStock <= 5 && maxStock > 0 && (
+                        <p className="text-xs text-amber-700 font-semibold">Only {maxStock} left in stock</p>
+                      )}
                     </div>
 
-                    <button 
-                      onClick={() => removeFromCart(item.id)}
-                      className="text-red-500 hover:text-red-600 p-2 rounded-md hover:bg-red-50 transition-colors flex items-center gap-1 text-sm font-medium"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span className="hidden sm:inline">Remove</span>
-                    </button>
+                    {/* Actions */}
+                    <div className="mt-auto flex items-center justify-between">
+                      <div className="flex items-center border border-neutral-300 rounded-md bg-white">
+                        <button 
+                          type="button"
+                          aria-label={`Decrease quantity for ${item.product?.name}`}
+                          onClick={() => updateCartItem(item.id, { quantity: Math.max(1, item.quantity - 1) })}
+                          className="p-2 text-navy hover:bg-neutral-100 transition-colors"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        <span className="w-8 text-center font-bold text-navy text-sm">{item.quantity}</span>
+                        <button 
+                          type="button"
+                          aria-label={`Increase quantity for ${item.product?.name}`}
+                          disabled={atMaxStock}
+                          onClick={() => updateCartItem(item.id, { quantity: item.quantity + 1 })}
+                          className={`p-2 transition-colors ${atMaxStock ? 'text-neutral-300 cursor-not-allowed' : 'text-navy hover:bg-neutral-100'}`}
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <button 
+                        type="button"
+                        aria-label={`Remove ${item.product?.name} from cart`}
+                        onClick={() => removeFromCart(item.id)}
+                        className="text-red-500 hover:text-red-600 p-2 rounded-md hover:bg-red-50 transition-colors flex items-center gap-1 text-sm font-medium"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span className="hidden sm:inline">Remove</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Order Summary */}
@@ -131,13 +156,32 @@ export default function Cart() {
             <div className="bg-white rounded-xl border border-neutral-200 p-6 sticky top-24 shadow-sm">
               <h2 className="text-xl font-display font-bold text-navy mb-6">Order Summary</h2>
               
+              {activeZones.length > 0 && (
+                <div className="mb-5 pb-4 border-b border-neutral-100">
+                  <label className="block text-xs font-semibold text-navy mb-1.5 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-dpc-blue" /> Estimate Delivery City in Kenya
+                  </label>
+                  <select
+                    value={matchedZone?.name || selectedCity}
+                    onChange={(e) => setSelectedCity(e.target.value)}
+                    className="w-full p-2.5 border border-neutral-300 rounded-md text-sm text-navy bg-white focus:ring-dpc-blue focus:border-dpc-blue"
+                  >
+                    {activeZones.map((zone) => (
+                      <option key={zone.id} value={zone.name}>
+                        {zone.name} ({convertPrice(zone.fee)} — {zone.estimatedTime || 'Standard'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="space-y-4 mb-6 text-sm text-text">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
                   <span className="font-medium">{convertPrice(subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Delivery Fee</span>
+                  <span>Delivery Fee ({matchedZone?.name || 'Nairobi'})</span>
                   <span className="font-medium">{convertPrice(deliveryFee)}</span>
                 </div>
                 <div className="flex justify-between">
@@ -154,15 +198,15 @@ export default function Cart() {
 
               <div className="border-t border-neutral-200 pt-4 mb-6">
                 <div className="flex justify-between items-center text-lg">
-                  <span className="font-bold text-navy">Total</span>
+                  <span className="font-bold text-navy">Estimated Total</span>
                   <span className="font-bold text-dpc-blue text-2xl">{convertPrice(total)}</span>
                 </div>
-                <p className="text-xs text-text-muted mt-1 text-right">Includes taxes</p>
+                <p className="text-xs text-text-muted mt-1 text-right">Final zone fee &amp; coupons verified at checkout</p>
               </div>
 
               {hasOutOfStock && (
                 <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 border border-red-100">
-                  One or more items in your cart are out of stock. Please remove them to proceed.
+                  One or more items in your cart exceed available stock. Please adjust quantities to proceed.
                 </div>
               )}
               <Button disabled={hasOutOfStock} 
@@ -175,7 +219,7 @@ export default function Cart() {
               </Button>
               
               <p className="text-center text-xs text-text-muted mt-4 flex items-center justify-center gap-1">
-                <span>🔒 Secure checkout. We accept major credit cards and mobile money.</span>
+                <span>Secure checkout via PesaPal, M-Pesa, and international cards.</span>
               </p>
             </div>
           </div>

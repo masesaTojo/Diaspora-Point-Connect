@@ -163,7 +163,7 @@ export function createOrdersRouter(deps: OrdersRouterDeps) {
   router.patch(
     '/admin/orders/:orderId/status',
     authenticate,
-    requireRole(ADMIN_ROUTE_ROLES.sales),
+    requireRole(ADMIN_ROUTE_ROLES.logistics),
     async (req: Request, res: Response) => {
       const svc = ensureService(res);
       if (!svc) return;

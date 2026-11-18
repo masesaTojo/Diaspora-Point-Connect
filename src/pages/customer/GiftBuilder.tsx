@@ -1,17 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Product } from '@/src/types';
-import { PackageOpen, Gift, Check, ArrowRight } from 'lucide-react';
+import { PackageOpen, Gift, Check, ArrowRight, User } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 import { useShop } from '@/src/contexts/ShopContext';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { auth, db } from '@/src/lib/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { Link, useNavigate } from 'react-router-dom';
+
+interface SavedRecipientQuick {
+  id: string;
+  name: string;
+  city: string;
+}
 
 export default function GiftBuilder() {
   const { addToCart, products, giftConfig, convertPrice } = useShop();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
   const [personalization, setPersonalization] = useState({ to: '', from: '', message: '' });
+  const [savedRecipients, setSavedRecipients] = useState<SavedRecipientQuick[]>([]);
+
+  useEffect(() => {
+    if (!currentUser?.id || !auth.currentUser?.emailVerified) {
+      setSavedRecipients([]);
+      return;
+    }
+    const unsub = onSnapshot(
+      collection(db, 'users', currentUser.id, 'recipients'),
+      (snap) => {
+        setSavedRecipients(
+          snap.docs.map((d) => ({
+            id: d.id,
+            name: String(d.data().name || ''),
+            city: String(d.data().city || ''),
+          }))
+        );
+      },
+      () => {
+        // Non-blocking fallback
+      }
+    );
+    return () => unsub();
+  }, [currentUser?.id]);
 
   const activeConfig = giftConfig;
   const minItems = activeConfig.minItems ?? 1;
@@ -158,6 +192,29 @@ export default function GiftBuilder() {
                 <h2 className="text-2xl font-display font-bold text-navy mb-6">2. Add a Personal Note</h2>
 
                 <div className="space-y-4 max-w-lg">
+                  {savedRecipients.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-semibold text-navy mb-2 flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-dpc-blue" /> Quick Select Saved Recipient in Kenya
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {savedRecipients.map((r) => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => setPersonalization({ ...personalization, to: r.name })}
+                            className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
+                              personalization.to === r.name
+                                ? 'bg-dpc-blue text-white border-dpc-blue'
+                                : 'bg-neutral-50 text-navy border-neutral-200 hover:border-dpc-blue'
+                            }`}
+                          >
+                            {r.name} ({r.city})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-semibold text-navy mb-1">To</label>
                     <input

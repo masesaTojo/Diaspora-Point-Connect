@@ -22,10 +22,9 @@ export function createApiApp(options: CreateAppOptions = {}) {
   app.use((_req: Request, res: Response, next: NextFunction) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     next();
   });
-
-  app.use(express.json({ limit: '1mb' }));
 
   let defaultOrderService: OrderService | null = options.orderService ?? null;
   const getOrderService = (): OrderService | null => {
@@ -43,6 +42,7 @@ export function createApiApp(options: CreateAppOptions = {}) {
   const pesaPalClient = options.pesaPalClient ?? new PesaPalClient();
 
   const apiRouter = express.Router();
+  apiRouter.use(express.json({ limit: '1mb' }));
   apiRouter.use(createHealthRouter());
   apiRouter.use(createAuthRouter(options.authDeps));
   apiRouter.use(createOrdersRouter({ authDeps: options.authDeps, getOrderService }));
@@ -61,25 +61,30 @@ export function createApiApp(options: CreateAppOptions = {}) {
     });
   });
 
-  apiRouter.use(
-    (err: Error & { status?: number; type?: string }, _req: Request, res: Response, _next: NextFunction) => {
-      if (err.type === 'entity.parse.failed') {
-        res.status(400).json({
-          error: 'Bad Request',
-          message: 'Malformed JSON request payload.',
-        });
-        return;
-      }
-
-      console.error('Unhandled API error:', err?.message || err);
-      res.status(err.status && err.status >= 400 ? err.status : 500).json({
-        error: 'Internal Server Error',
-        message: 'An unexpected error occurred processing the API request.',
+  const safeApiErrorHandler = (
+    err: Error & { status?: number; type?: string },
+    _req: Request,
+    res: Response,
+    _next: NextFunction
+  ) => {
+    if (err.type === 'entity.parse.failed') {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'Malformed JSON request payload.',
       });
+      return;
     }
-  );
 
+    console.error('Unhandled API error:', err?.message || err);
+    res.status(err.status && err.status >= 400 ? err.status : 500).json({
+      error: 'Internal Server Error',
+      message: 'An unexpected error occurred processing the API request.',
+    });
+  };
+
+  apiRouter.use(safeApiErrorHandler);
   app.use('/api', apiRouter);
+  app.use(safeApiErrorHandler);
 
   return app;
 }

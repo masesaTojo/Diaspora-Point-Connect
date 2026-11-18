@@ -113,13 +113,24 @@ export default function TrackOrder() {
 
   const getStatusStepIndex = (status: OrderStatus) => {
     switch (status) {
-      case 'CONFIRMED': return 0;
-      case 'PROCESSING': return 1;
+      case 'NEW':
+      case 'PAYMENT_PENDING':
+      case 'PAYMENT_CONFIRMED':
+      case 'CONFIRMED':
+        return 0;
+      case 'PROCESSING':
+      case 'STOCK_ISSUE':
+        return 1;
+      case 'READY_FOR_DELIVERY':
       case 'DISPATCHED':
       case 'OUT_FOR_DELIVERY':
-      case 'READY_FOR_DELIVERY': return 2;
-      case 'DELIVERED': return 3;
-      default: return 0;
+      case 'ADDRESS_ISSUE':
+      case 'DELIVERY_FAILED':
+        return 2;
+      case 'DELIVERED':
+        return 3;
+      default:
+        return 0;
     }
   };
 
@@ -246,12 +257,20 @@ export default function TrackOrder() {
 
               {/* Step Progress Tracker */}
               <div className="py-8">
-                {searchedOrder.status === 'CANCELLED' ? (
+                {searchedOrder.status === 'CANCELLED' || searchedOrder.status === 'REFUNDED' ? (
                   <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-center text-sm font-medium">
-                    This order was cancelled. If you believe this is in error, please contact customer care.
+                    This order was {searchedOrder.status.toLowerCase()}. If you believe this is in error, please contact customer care.
                   </div>
                 ) : (
                   <div className="relative">
+                    {(searchedOrder.status === 'STOCK_ISSUE' || searchedOrder.status === 'ADDRESS_ISSUE' || searchedOrder.status === 'DELIVERY_FAILED') && (
+                      <div className="mb-6 bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-xl text-sm flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>
+                          Attention needed ({searchedOrder.status.replace(/_/g, ' ')}): Our Nairobi concierge team is coordinating directly to resolve this delivery.
+                        </span>
+                      </div>
+                    )}
                     <div className="hidden sm:block absolute top-4 left-6 right-6 h-1 bg-neutral-200 -z-0">
                       <div 
                         className="h-full bg-emerald-500 transition-all duration-700"
@@ -308,6 +327,23 @@ export default function TrackOrder() {
                         Scheduled: {searchedOrder.deliveryDate}
                       </p>
                     )}
+                    {searchedOrder.expectedDeliveryTime && (
+                      <p className="text-xs text-dpc-blue font-semibold mt-1 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        Estimated Delivery Window: {searchedOrder.expectedDeliveryTime}
+                      </p>
+                    )}
+                    {searchedOrder.deliveryNotes && (
+                      <p className="text-xs text-text-muted italic mt-2 bg-white p-2 rounded border border-neutral-200">
+                        Notes: "{searchedOrder.deliveryNotes}"
+                      </p>
+                    )}
+                    {searchedOrder.proofOfDelivery && (
+                      <p className="text-xs text-emerald-700 font-semibold mt-2 flex items-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        Delivery Proof: {searchedOrder.proofOfDelivery}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -318,7 +354,11 @@ export default function TrackOrder() {
                   </h4>
                   <div className="text-sm space-y-1">
                     <p className="font-semibold text-navy">{searchedOrder.customerName || 'Diaspora Customer'}</p>
-                    <p className="text-text-muted">{searchedOrder.customerEmail || 'sender@example.com'}</p>
+                    {searchedOrder.customerEmail ? (
+                      <p className="text-text-muted">{searchedOrder.customerEmail}</p>
+                    ) : (
+                      <p className="text-text-muted text-xs">Verified purchaser account on file</p>
+                    )}
                     <p className="text-xs text-dpc-blue font-medium mt-3 flex items-center gap-1">
                       <ShieldCheck className="w-3.5 h-3.5" />
                       Delivery coordination handled directly with recipient

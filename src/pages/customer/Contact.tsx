@@ -11,6 +11,10 @@ import {
   Globe2
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
+import { auth, db } from '@/src/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { buildFirestoreErrorInfo, OperationType, stripUndefined } from '@/src/lib/firestoreErrors';
+import { SupportTicket } from '@/src/types';
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -23,13 +27,51 @@ export default function Contact() {
   });
 
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [ticketId, setTicketId] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const id = 'DPC-TK-' + Math.floor(100000 + Math.random() * 900000);
-    setTicketId(id);
-    setSubmitted(true);
+    setSubmitError(null);
+    if (formData.message.trim().length < 5) {
+      setSubmitError('Please enter a message of at least 5 characters.');
+      return;
+    }
+
+    setSubmitting(true);
+    const id = `DPC-TK-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const nowIso = new Date().toISOString();
+    const verifiedUid = auth.currentUser?.emailVerified ? auth.currentUser.uid : undefined;
+
+    const payload: SupportTicket = stripUndefined({
+      id,
+      customerId: verifiedUid,
+      name: formData.name.trim().slice(0, 120),
+      email: formData.email.trim().slice(0, 254),
+      phone: formData.phone.trim() ? formData.phone.trim().slice(0, 32) : undefined,
+      country: formData.country.trim().slice(0, 80),
+      subject: formData.subject.trim().slice(0, 160),
+      message: formData.message.trim().slice(0, 3000),
+      source: 'CONTACT_PAGE',
+      status: 'OPEN',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    }) as SupportTicket;
+
+    try {
+      await setDoc(doc(db, 'supportTickets', id), payload);
+      setTicketId(id);
+      setSubmitted(true);
+    } catch (err) {
+      console.error(
+        'Contact inquiry submission failed:',
+        JSON.stringify(buildFirestoreErrorInfo(err, OperationType.CREATE, `supportTickets/${id}`))
+      );
+      setSubmitError('Unable to submit message right now. Please try again or reach us via WhatsApp.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -151,6 +193,11 @@ export default function Contact() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
+                {submitError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-xs">
+                    {submitError}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-navy uppercase mb-1">Your Name</label>
@@ -232,8 +279,8 @@ export default function Contact() {
                   />
                 </div>
 
-                <Button type="submit" className="w-full py-3.5 bg-navy hover:bg-navy-light text-white font-bold rounded-xl flex items-center justify-center gap-2">
-                  <Send className="w-4 h-4" /> Submit Inquiry
+                <Button type="submit" disabled={submitting} className="w-full py-3.5 bg-navy hover:bg-navy-light text-white font-bold rounded-xl flex items-center justify-center gap-2">
+                  <Send className="w-4 h-4" /> {submitting ? 'Submitting Inquiry...' : 'Submit Inquiry'}
                 </Button>
               </form>
             )}

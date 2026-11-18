@@ -6,6 +6,7 @@ import { Button } from '@/src/components/ui/Button';
 import { auth, db } from '@/src/lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { buildFirestoreErrorInfo, OperationType } from '@/src/lib/firestoreErrors';
+import { downloadCsvFile } from '@/src/lib/csv';
 import { useAuth } from '@/src/contexts/AuthContext';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -40,6 +41,8 @@ export default function Orders() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [deliveryProofInput, setDeliveryProofInput] = useState('');
+  const [expectedTimeInput, setExpectedTimeInput] = useState('');
 
   useEffect(() => {
     if (!currentUser) return;
@@ -98,6 +101,13 @@ export default function Orders() {
     }
   }, [currentUser, loadOrders]);
 
+  useEffect(() => {
+    if (selectedOrder) {
+      setDeliveryProofInput(selectedOrder.proofOfDelivery || '');
+      setExpectedTimeInput(selectedOrder.expectedDeliveryTime || '');
+    }
+  }, [selectedOrder?.id]);
+
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus, extraData: Partial<Order> = {}) => {
     if (!auth.currentUser) return;
     setUpdatingOrderId(orderId);
@@ -132,29 +142,46 @@ export default function Orders() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Order ID', 'Date', 'Customer Name', 'Customer Email', 'Customer Phone', 'Recipient Name', 'Recipient Phone', 'City', 'Address', 'Status', 'Total ($)'];
-    const rows = filteredOrders.map(o => [
+    const headers = [
+      'Order ID',
+      'Date',
+      'Customer Name',
+      'Customer Email',
+      'Customer Phone',
+      'Recipient Name',
+      'Recipient Phone',
+      'City',
+      'Address',
+      'Scheduled Date',
+      'Delivery ETA',
+      'Driver',
+      'Proof of Delivery',
+      'Status',
+      'Payment Status',
+      'Currency',
+      'Total (USD)',
+    ];
+    const rows = filteredOrders.map((o) => [
       o.id,
       o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '',
-      `"${o.customerName || ''}"`,
+      o.customerName || '',
       o.customerEmail || '',
       o.customerPhone || '',
-      `"${o.recipientName || ''}"`,
+      o.recipientName || '',
       o.recipientPhone || '',
       o.deliveryCity || '',
-      `"${o.deliveryAddress || ''}"`,
+      o.deliveryAddress || '',
+      o.deliveryDate || '',
+      o.expectedDeliveryTime || '',
+      o.driverName || '',
+      o.proofOfDelivery || '',
       o.status || '',
-      o.total?.toFixed(2) || '0.00'
+      o.paymentStatus || '',
+      o.currency || 'USD',
+      o.total?.toFixed(2) || '0.00',
     ]);
-    
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `dpc_orders_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    downloadCsvFile(`dpc_orders_${new Date().toISOString().split('T')[0]}.csv`, headers, rows);
   };
 
   const filteredOrders = orders.filter(order => {
@@ -336,14 +363,49 @@ export default function Orders() {
                     </div>
                   )}
                   {selectedOrder.status === 'DISPATCHED' && (
-                    <Button size="sm" onClick={() => handleStatusChange(selectedOrder.id!, 'OUT_FOR_DELIVERY')} className="bg-purple-600 hover:bg-purple-700">
-                      <Truck className="h-4 w-4 mr-1" /> Out For Delivery
-                    </Button>
+                    <div className="flex flex-col gap-2 w-full">
+                      <input
+                        type="text"
+                        placeholder="Expected delivery ETA (e.g. Today 3:30 PM EAT)"
+                        value={expectedTimeInput}
+                        onChange={(e) => setExpectedTimeInput(e.target.value)}
+                        className="text-xs p-2 border border-neutral-300 rounded bg-white"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          handleStatusChange(selectedOrder.id!, 'OUT_FOR_DELIVERY', {
+                            expectedDeliveryTime: expectedTimeInput.trim() || undefined,
+                          })
+                        }
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
+                        <Truck className="h-4 w-4 mr-1" /> Out For Delivery
+                      </Button>
+                    </div>
                   )}
                   {selectedOrder.status === 'OUT_FOR_DELIVERY' && (
-                    <Button size="sm" onClick={() => handleStatusChange(selectedOrder.id!, 'DELIVERED', { proofOfDelivery: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=400' })} className="bg-green-600 hover:bg-green-700">
-                      <Check className="h-4 w-4 mr-1" /> Mark Delivered (Capture Proof)
-                    </Button>
+                    <div className="flex flex-col gap-2 w-full">
+                      <input
+                        type="text"
+                        placeholder="Proof note or photo URL (e.g. Received by Mary / https://...)"
+                        value={deliveryProofInput}
+                        onChange={(e) => setDeliveryProofInput(e.target.value)}
+                        className="text-xs p-2 border border-neutral-300 rounded bg-white"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const proof =
+                            deliveryProofInput.trim() ||
+                            `Handed over to ${selectedOrder.recipientName || 'recipient'} (${new Date().toISOString().split('T')[0]})`;
+                          handleStatusChange(selectedOrder.id!, 'DELIVERED', { proofOfDelivery: proof });
+                        }}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <Check className="h-4 w-4 mr-1" /> Mark Delivered (Save Proof)
+                      </Button>
+                    </div>
                   )}
                   {['NEW', 'CONFIRMED', 'PROCESSING'].includes(selectedOrder.status || '') && (
                     <Button size="sm" variant="outline" onClick={() => handleStatusChange(selectedOrder.id!, 'CANCELLED')} className="text-red-600 border-red-200 hover:bg-red-50 mt-2">
@@ -367,18 +429,26 @@ export default function Orders() {
               <div className="space-y-6">
                 
                 {/* Logistics Info Block */}
-                {selectedOrder.driverId && (
-                  <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                {(selectedOrder.driverId || selectedOrder.expectedDeliveryTime || selectedOrder.proofOfDelivery) && (
+                  <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg space-y-1.5">
                     <h4 className="font-semibold text-dpc-blue mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
                       <Truck className="w-4 h-4" /> Logistics Details
                     </h4>
-                    <p className="text-sm">
-                      <span className="text-text-muted">Assigned Driver:</span>{' '}
-                      <span className="font-medium text-navy">{drivers.find(d => d.id === selectedOrder.driverId)?.name || selectedOrder.driverId}</span>
-                    </p>
+                    {selectedOrder.driverId && (
+                      <p className="text-sm">
+                        <span className="text-text-muted">Assigned Driver:</span>{' '}
+                        <span className="font-medium text-navy">{drivers.find(d => d.id === selectedOrder.driverId)?.name || selectedOrder.driverId}</span>
+                      </p>
+                    )}
+                    {selectedOrder.expectedDeliveryTime && (
+                      <p className="text-xs text-navy">
+                        <span className="text-text-muted">Expected ETA:</span> {selectedOrder.expectedDeliveryTime}
+                      </p>
+                    )}
                     {selectedOrder.proofOfDelivery && (
-                      <div className="mt-2 text-sm">
-                        <span className="text-text-muted flex items-center gap-2"><Check className="w-4 h-4 text-green-600" /> Proof of Delivery Verified</span>
+                      <div className="mt-2 text-xs text-emerald-800 bg-white/80 p-2 rounded border border-emerald-200">
+                        <span className="font-semibold flex items-center gap-1.5 mb-0.5"><Check className="w-3.5 h-3.5 text-green-600" /> Proof of Delivery Verified</span>
+                        <span className="break-all text-text-muted">{selectedOrder.proofOfDelivery}</span>
                       </div>
                     )}
                   </div>

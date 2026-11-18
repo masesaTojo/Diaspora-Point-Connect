@@ -3,7 +3,7 @@ import { useSearchParams, useParams, Link } from 'react-router-dom';
 import { SlidersHorizontal, ChevronDown, X } from 'lucide-react';
 import { ProductCard } from '@/src/components/ui/ProductCard';
 import { Button } from '@/src/components/ui/Button';
-import { mockRecipients, mockOccasions } from '@/src/lib/mockData';
+import { STOREFRONT_RECIPIENTS, STOREFRONT_OCCASIONS } from '@/src/lib/storefrontConstants';
 import { useShop } from '@/src/contexts/ShopContext';
 
 export default function Shop() {
@@ -205,7 +205,7 @@ export default function Shop() {
               <div>
                 <h3 className="font-display font-semibold text-lg text-navy mb-4 border-b border-neutral-border pb-2">Recipient</h3>
                 <div className="space-y-2">
-                  {mockRecipients.map((rec) => (
+                  {STOREFRONT_RECIPIENTS.map((rec) => (
                     <label key={rec.name} className="flex items-center gap-2 cursor-pointer">
                       <input 
                         type="radio" 
@@ -228,7 +228,7 @@ export default function Shop() {
               <div>
                 <h3 className="font-display font-semibold text-lg text-navy mb-4 border-b border-neutral-border pb-2">Occasion</h3>
                 <div className="space-y-2">
-                  {mockOccasions.map((occ) => (
+                  {STOREFRONT_OCCASIONS.map((occ) => (
                     <label key={occ.name} className="flex items-center gap-2 cursor-pointer">
                       <input 
                         type="radio" 

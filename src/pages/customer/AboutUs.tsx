@@ -18,9 +18,16 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
+import { auth, db } from '@/src/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { buildFirestoreErrorInfo, OperationType, stripUndefined } from '@/src/lib/firestoreErrors';
+import { SupportTicket } from '@/src/types';
 
 export default function AboutUs() {
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [ticketId, setTicketId] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -30,9 +37,47 @@ export default function AboutUs() {
     message: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormSubmitted(true);
+    setSubmitError(null);
+    if (formData.message.trim().length < 5) {
+      setSubmitError('Please write at least 5 characters describing your inquiry.');
+      return;
+    }
+
+    setSubmitting(true);
+    const id = `TICK-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const nowIso = new Date().toISOString();
+    const verifiedUid = auth.currentUser?.emailVerified ? auth.currentUser.uid : undefined;
+
+    const payload: SupportTicket = stripUndefined({
+      id,
+      customerId: verifiedUid,
+      name: formData.name.trim().slice(0, 120),
+      email: formData.email.trim().slice(0, 254),
+      phone: formData.phone.trim() ? formData.phone.trim().slice(0, 32) : undefined,
+      country: formData.country.trim().slice(0, 80),
+      subject: formData.subject.trim().slice(0, 160),
+      message: formData.message.trim().slice(0, 3000),
+      source: 'ABOUT_PAGE',
+      status: 'OPEN',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    }) as SupportTicket;
+
+    try {
+      await setDoc(doc(db, 'supportTickets', id), payload);
+      setTicketId(id);
+      setFormSubmitted(true);
+    } catch (err) {
+      console.error(
+        'AboutUs inquiry submission failed:',
+        JSON.stringify(buildFirestoreErrorInfo(err, OperationType.CREATE, `supportTickets/${id}`))
+      );
+      setSubmitError('Unable to submit your inquiry right now. Please try WhatsApp or try again shortly.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -263,7 +308,7 @@ export default function AboutUs() {
                   </div>
                   <h3 className="text-xl font-bold text-navy mb-2">Message Received!</h3>
                   <p className="text-xs text-text-muted max-w-md mx-auto mb-6">
-                    Thank you for reaching out to Diaspora Point Connect. A dedicated concierge officer will reply to your email or WhatsApp message within 2 hours.
+                    Your inquiry ticket <span className="font-mono font-bold text-navy">{ticketId}</span> has been logged. A dedicated concierge officer will reply via email or WhatsApp within 2 hours.
                   </p>
                   <Button onClick={() => setFormSubmitted(false)} variant="outline" size="sm">
                     Send Another Inquiry
@@ -272,6 +317,11 @@ export default function AboutUs() {
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <h3 className="font-bold text-navy text-lg mb-2">Send Us a Direct Message</h3>
+                  {submitError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs">
+                      {submitError}
+                    </div>
+                  )}
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -354,8 +404,8 @@ export default function AboutUs() {
                     />
                   </div>
 
-                  <Button type="submit" className="w-full bg-navy hover:bg-navy-light font-bold text-xs py-2.5">
-                    <Send className="w-3.5 h-3.5 mr-1.5" /> Submit Inquiry
+                  <Button type="submit" disabled={submitting} className="w-full bg-navy hover:bg-navy-light font-bold text-xs py-2.5">
+                    <Send className="w-3.5 h-3.5 mr-1.5" /> {submitting ? 'Submitting Inquiry...' : 'Submit Inquiry'}
                   </Button>
                 </form>
               )}

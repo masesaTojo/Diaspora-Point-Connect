@@ -4,7 +4,7 @@ import { Button } from '@/src/components/ui/Button';
 import { ArrowRight, Package, Heart, Globe, CreditCard } from 'lucide-react';
 import { ProductCard } from '@/src/components/ui/ProductCard';
 import { SectionHeading } from '@/src/components/ui/SectionHeading';
-import { mockRecipients, mockOccasions, mockCollections } from '@/src/lib/mockData';
+import { STOREFRONT_RECIPIENTS, STOREFRONT_OCCASIONS, STOREFRONT_COLLECTIONS } from '@/src/lib/storefrontConstants';
 import { useShop } from '@/src/contexts/ShopContext';
 import heroFamilyImg from '@/src/assets/images/kenya_diaspora_hero_1794896174680.jpg';
 
@@ -94,7 +94,7 @@ export default function Home() {
               align="center"
             />
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-              {mockRecipients.map((rec, i) => (
+              {STOREFRONT_RECIPIENTS.map((rec, i) => (
                 <Link to={`/shop?recipient=${encodeURIComponent(rec.name)}`} key={i} className="group cursor-pointer flex flex-col items-center text-center">
                   <div className="w-32 h-32 rounded-full overflow-hidden mb-4 border-4 border-white shadow-md group-hover:border-dpc-yellow transition-colors">
                     <img src={rec.image} alt={rec.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
@@ -137,7 +137,7 @@ export default function Home() {
             align="center"
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {mockCollections.map((collection, i) => (
+            {STOREFRONT_COLLECTIONS.map((collection, i) => (
               <Link to={`/shop/collection/${collection.slug}`} key={i} className="group relative rounded-2xl overflow-hidden cursor-pointer shadow-sm hover:shadow-xl transition-shadow aspect-[4/5] block">
                 <img 
                   src={collection.image} 
@@ -194,7 +194,7 @@ export default function Home() {
             <div>
               <SectionHeading title="Shop by Occasion" />
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {mockOccasions.map((occ, i) => (
+                {STOREFRONT_OCCASIONS.map((occ, i) => (
                   <Link to={`/shop?occasion=${encodeURIComponent(occ.name)}`} key={i} className="bg-white p-4 rounded-xl shadow-sm border border-neutral-100 flex items-center space-x-4 cursor-pointer hover:border-dpc-blue hover:shadow-md transition-all">
                     <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-2xl ${occ.color}`}>
                       {occ.icon}

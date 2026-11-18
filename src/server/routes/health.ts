@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { getFirebaseAdminContext } from '../firebaseAdmin.ts';
+import { getServerExchangeRates } from '../services/orderService.ts';
 
 export function createHealthRouter() {
   const router = Router();
@@ -15,6 +16,17 @@ export function createHealthRouter() {
       firebaseProjectId: adminCtx.projectId,
       firestoreDatabaseId: adminCtx.firestoreDatabaseId,
       adminCredentialMode: adminCtx.credentialMode,
+    });
+  });
+
+  router.get('/fx-rates', async (_req: Request, res: Response) => {
+    const rates = await getServerExchangeRates();
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.status(200).json({
+      ok: true,
+      base: 'USD',
+      rates,
+      timestamp: new Date().toISOString(),
     });
   });
 

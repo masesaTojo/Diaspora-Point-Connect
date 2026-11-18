@@ -3,9 +3,10 @@ import { Driver, Order } from '@/src/types';
 import { auth, db } from '@/src/lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { buildFirestoreErrorInfo, OperationType } from '@/src/lib/firestoreErrors';
-import { Globe, Truck, DollarSign, Package, TrendingUp, CheckCircle2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Globe, Truck, DollarSign, Package, TrendingUp, CheckCircle2, RefreshCw, AlertCircle, Download } from 'lucide-react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { Button } from '@/src/components/ui/Button';
+import { downloadCsvFile } from '@/src/lib/csv';
 
 export default function Analytics() {
   const { hasRole, currentUser } = useAuth();
@@ -98,6 +99,40 @@ export default function Analytics() {
     return acc;
   }, {} as Record<string, number>);
 
+  const handleExportReport = () => {
+    const headers = [
+      'Order ID',
+      'Created At',
+      'City',
+      'Status',
+      'Payment Status',
+      'Subtotal (USD)',
+      'Delivery Fee (USD)',
+      'Service Fee (USD)',
+      'Discount (USD)',
+      'Total (USD)',
+      'Proof of Delivery',
+    ];
+    const rows = filteredOrders.map((order) => [
+      order.id,
+      order.createdAt || '',
+      order.deliveryCity || 'Nairobi',
+      order.status || '',
+      order.paymentStatus || '',
+      (order.subtotal ?? 0).toFixed(2),
+      (order.deliveryFee ?? 0).toFixed(2),
+      (order.serviceFee ?? 0).toFixed(2),
+      (order.discount ?? 0).toFixed(2),
+      (order.total ?? 0).toFixed(2),
+      order.proofOfDelivery || '',
+    ]);
+    downloadCsvFile(
+      `dpc_analytics_${timeframe}_${new Date().toISOString().split('T')[0]}.csv`,
+      headers,
+      rows
+    );
+  };
+
   if (!isAllowed) {
     return (
       <div className="p-8 text-center text-red-500 font-bold">
@@ -114,7 +149,7 @@ export default function Analytics() {
           <p className="text-sm text-text-muted">Live metrics calculated directly from Firestore orders and fleet status.</p>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select 
             className="p-2 border border-neutral-300 rounded-md text-sm bg-white"
             value={timeframe}
@@ -126,6 +161,9 @@ export default function Analytics() {
             <option value="12months">Last 12 Months</option>
             <option value="custom">All Time</option>
           </select>
+          <Button variant="outline" size="sm" onClick={handleExportReport} disabled={filteredOrders.length === 0} className="border-neutral-300">
+            <Download className="w-4 h-4 mr-1.5" /> Export Report
+          </Button>
           <Button variant="outline" size="sm" onClick={loadOrders} disabled={loadingOrders} className="border-neutral-300">
             <RefreshCw className={`w-4 h-4 mr-1.5 ${loadingOrders ? 'animate-spin' : ''}`} /> Refresh
           </Button>

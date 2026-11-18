@@ -1,16 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Star, Truck, Calendar, Gift, Heart, Plus, Minus, CheckCircle, Info, User, AlertCircle } from 'lucide-react';
+import { Star, Truck, Calendar, Gift, Heart, Plus, Minus, CheckCircle, Info, User, AlertCircle, ShieldCheck, Send } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Badge';
 import { ProductCard } from '@/src/components/ui/ProductCard';
-import { mockRecipients } from '@/src/lib/mockData';
+import { STOREFRONT_RECIPIENTS } from '@/src/lib/storefrontConstants';
 import { useShop } from '@/src/contexts/ShopContext';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { auth, db } from '@/src/lib/firebase';
+import { collection, doc, onSnapshot, query, setDoc, where } from 'firebase/firestore';
+import { buildFirestoreErrorInfo, OperationType, stripUndefined } from '@/src/lib/firestoreErrors';
+import { ProductReview } from '@/src/types';
+
+interface SavedRecipientOption {
+  id: string;
+  name: string;
+  city: string;
+}
 
 export default function ProductDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { products, addToCart, toggleWishlist, wishlist, convertPrice } = useShop();
+  const { currentUser, login } = useAuth();
   
   const product = products.find(p => p.slug === slug || p.id === slug);
   
@@ -20,6 +32,78 @@ export default function ProductDetail() {
   const [giftMessage, setGiftMessage] = useState('');
   const [includeCard, setIncludeCard] = useState(false);
   const [deliveryDate, setDeliveryDate] = useState('');
+
+  // Saved Recipients & Live Reviews State
+  const [savedRecipients, setSavedRecipients] = useState<SavedRecipientOption[]>([]);
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewSuccess, setReviewSuccess] = useState(false);
+
+  const productId = product?.id || '';
+
+  useEffect(() => {
+    if (!currentUser?.id || !auth.currentUser?.emailVerified) {
+      setSavedRecipients([]);
+      return;
+    }
+    const unsub = onSnapshot(
+      collection(db, 'users', currentUser.id, 'recipients'),
+      (snap) => {
+        setSavedRecipients(
+          snap.docs.map((d) => ({
+            id: d.id,
+            name: String(d.data().name || ''),
+            city: String(d.data().city || ''),
+          }))
+        );
+      },
+      (err) => {
+        console.warn('Unable to load saved recipients:', buildFirestoreErrorInfo(err, OperationType.LIST, `users/${currentUser.id}/recipients`));
+      }
+    );
+    return () => unsub();
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!productId) {
+      setReviews([]);
+      return;
+    }
+    const reviewsQuery = query(
+      collection(db, 'productReviews'),
+      where('productId', '==', productId)
+    );
+    const unsub = onSnapshot(
+      reviewsQuery,
+      (snap) => {
+        const list = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as ProductReview))
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setReviews(list);
+      },
+      (err) => {
+        console.warn('Product reviews listener unavailable:', buildFirestoreErrorInfo(err, OperationType.LIST, 'productReviews'));
+      }
+    );
+    return () => unsub();
+  }, [productId]);
+
+  const liveReviewStats = useMemo(() => {
+    if (reviews.length > 0) {
+      const avg = reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / reviews.length;
+      return {
+        rating: Number(avg.toFixed(1)),
+        count: reviews.length,
+      };
+    }
+    return {
+      rating: product?.rating || 0,
+      count: product?.reviewCount || 0,
+    };
+  }, [reviews, product?.rating, product?.reviewCount]);
 
   if (!product) {
     return (
@@ -33,7 +117,6 @@ export default function ProductDetail() {
     );
   }
 
-  const productId = product.id || '';
   const isWishlisted = wishlist.includes(productId);
   const isOutOfStock = product.availability === 'OUT_OF_STOCK' || (typeof product.inventory === 'number' && product.inventory <= 0);
   const isLowStock = !isOutOfStock && typeof product.inventory === 'number' && product.inventory > 0 && product.inventory <= 5;
@@ -53,6 +136,71 @@ export default function ProductDetail() {
       deliveryDate
     });
     navigate('/cart');
+  };
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setReviewError(null);
+    setReviewSuccess(false);
+
+    if (!currentUser || !auth.currentUser || !auth.currentUser.emailVerified) {
+      setReviewError('Please sign in with a verified Google account to submit a product review.');
+      return;
+    }
+
+    const trimmedComment = reviewComment.trim();
+    if (trimmedComment.length < 3 || trimmedComment.length > 2000) {
+      setReviewError('Please write a review comment between 3 and 2,000 characters.');
+      return;
+    }
+
+    setReviewSubmitting(true);
+    try {
+      let verifiedPurchase = false;
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        const res = await fetch('/api/orders/my', {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const orders = Array.isArray(data.orders) ? data.orders : [];
+          verifiedPurchase = orders.some(
+            (ord: { items?: { productId?: string }[] }) =>
+              Array.isArray(ord.items) && ord.items.some((item) => item.productId === productId)
+          );
+        }
+      } catch {
+        // Non-blocking fallback
+      }
+
+      const revId = `rev-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const userName =
+        `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() ||
+        currentUser.email.split('@')[0] ||
+        'Verified Customer';
+
+      const payload: ProductReview = stripUndefined({
+        id: revId,
+        productId,
+        userId: currentUser.id,
+        userName,
+        rating: Math.min(5, Math.max(1, Math.round(reviewRating))),
+        comment: trimmedComment,
+        verifiedPurchase,
+        createdAt: new Date().toISOString(),
+      });
+
+      await setDoc(doc(db, 'productReviews', revId), payload);
+      setReviewComment('');
+      setReviewRating(5);
+      setReviewSuccess(true);
+    } catch (err) {
+      console.error('Review submission failed:', buildFirestoreErrorInfo(err, OperationType.CREATE, 'productReviews'));
+      setReviewError('Unable to publish review right now. Please try again later.');
+    } finally {
+      setReviewSubmitting(false);
+    }
   };
 
   return (
@@ -118,11 +266,11 @@ export default function ProductDetail() {
             <h1 className="text-3xl md:text-4xl font-display font-bold text-navy mb-2">{product.name}</h1>
             
             <div className="flex items-center gap-4 mb-6">
-              {product.rating && (
+              {liveReviewStats.rating > 0 && (
                 <div className="flex items-center gap-1">
                   <Star className="w-5 h-5 fill-dpc-yellow text-dpc-yellow" />
-                  <span className="font-bold text-navy">{product.rating}</span>
-                  <span className="text-text-muted">({product.reviewCount} reviews)</span>
+                  <span className="font-bold text-navy">{liveReviewStats.rating}</span>
+                  <span className="text-text-muted">({liveReviewStats.count} {liveReviewStats.count === 1 ? 'review' : 'reviews'})</span>
                 </div>
               )}
               {isOutOfStock ? (
@@ -138,7 +286,7 @@ export default function ProductDetail() {
               ) : (
                 <div className="flex items-center gap-1 text-green-600 text-sm font-medium">
                   <CheckCircle className="w-4 h-4" />
-                  In Stock & Ready for Delivery
+                  In Stock &amp; Ready for Delivery
                 </div>
               )}
             </div>
@@ -207,13 +355,26 @@ export default function ProductDetail() {
                   <select 
                     value={selectedRecipient}
                     onChange={(e) => setSelectedRecipient(e.target.value)}
-                    className="w-full border border-neutral-300 rounded-md p-3 text-navy focus:ring-dpc-blue focus:border-dpc-blue"
+                    className="w-full border border-neutral-300 rounded-md p-3 text-navy focus:ring-dpc-blue focus:border-dpc-blue bg-white"
                   >
                     <option value="">Select Recipient (Optional)</option>
-                    <option value="mum">Mum</option>
-                    <option value="dad">Dad</option>
-                    <option value="partner">Partner</option>
-                    <option value="other">Other</option>
+                    {savedRecipients.length > 0 && (
+                      <optgroup label="My Saved Recipients in Kenya">
+                        {savedRecipients.map((r) => (
+                          <option key={r.id} value={`${r.name} (${r.city})`}>
+                            {r.name} ({r.city})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label="Recipient Relationship">
+                      {STOREFRONT_RECIPIENTS.map((rec) => (
+                        <option key={rec.name} value={rec.name.toLowerCase()}>
+                          {rec.name}
+                        </option>
+                      ))}
+                      <option value="other">Other</option>
+                    </optgroup>
                   </select>
                 </div>
               </div>
@@ -275,6 +436,135 @@ export default function ProductDetail() {
               Secure payment processing. Delivery guaranteed.
             </p>
 
+          </div>
+        </div>
+
+        {/* Customer Reviews Section */}
+        <div className="border-t border-neutral-200 pt-14 mb-16">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+            <div className="lg:col-span-1 space-y-4">
+              <h2 className="text-2xl font-display font-bold text-navy">Customer Reviews</h2>
+              <div className="bg-white rounded-xl border border-neutral-200 p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-4xl font-bold text-navy">
+                    {liveReviewStats.rating > 0 ? liveReviewStats.rating.toFixed(1) : '—'}
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`w-4 h-4 ${
+                            star <= Math.round(liveReviewStats.rating)
+                              ? 'fill-dpc-yellow text-dpc-yellow'
+                              : 'text-neutral-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-xs text-text-muted mt-1">
+                      Based on {liveReviewStats.count} {liveReviewStats.count === 1 ? 'review' : 'reviews'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl border border-neutral-200 p-6">
+                <h3 className="font-bold text-navy mb-3">Write a Review</h3>
+                {!currentUser ? (
+                  <div className="space-y-3 text-sm text-text-muted">
+                    <p>Sign in with your Google account to share feedback about this gift.</p>
+                    <Button size="sm" variant="outline" onClick={login}>
+                      Sign in with Google
+                    </Button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSubmitReview} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-navy mb-1.5">Your Rating</label>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewRating(star)}
+                            className="p-1"
+                            aria-label={`Rate ${star} stars`}
+                          >
+                            <Star
+                              className={`w-6 h-6 transition-colors ${
+                                star <= reviewRating
+                                  ? 'fill-dpc-yellow text-dpc-yellow'
+                                  : 'text-neutral-300 hover:text-dpc-yellow'
+                              }`}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-navy mb-1.5">Your Review</label>
+                      <textarea
+                        rows={3}
+                        required
+                        value={reviewComment}
+                        onChange={(e) => setReviewComment(e.target.value)}
+                        placeholder="How was the gift quality and Kenya delivery experience?"
+                        className="w-full border border-neutral-300 rounded-md p-2.5 text-sm text-navy focus:ring-dpc-blue focus:border-dpc-blue"
+                      />
+                    </div>
+                    {reviewError && <p className="text-xs text-red-600">{reviewError}</p>}
+                    {reviewSuccess && (
+                      <p className="text-xs text-emerald-700 font-medium">
+                        Thank you! Your review has been published.
+                      </p>
+                    )}
+                    <Button type="submit" size="sm" disabled={reviewSubmitting} className="w-full flex items-center justify-center gap-2">
+                      <Send className="w-3.5 h-3.5" />
+                      {reviewSubmitting ? 'Publishing...' : 'Publish Review'}
+                    </Button>
+                  </form>
+                )}
+              </div>
+            </div>
+
+            <div className="lg:col-span-2 space-y-4">
+              {reviews.length === 0 ? (
+                <div className="bg-white rounded-xl border border-neutral-200 p-8 text-center">
+                  <p className="text-navy font-semibold mb-1">No verified customer reviews submitted yet</p>
+                  <p className="text-sm text-text-muted">Be the first diaspora sender to review this gift after delivery in Kenya.</p>
+                </div>
+              ) : (
+                reviews.map((rev) => (
+                  <div key={rev.id} className="bg-white rounded-xl border border-neutral-200 p-6 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-navy">{rev.userName}</span>
+                        {rev.verifiedPurchase && (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200">
+                            <ShieldCheck className="w-3.5 h-3.5" /> Verified Buyer
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-text-muted">
+                        {new Date(rev.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`w-4 h-4 ${
+                            star <= rev.rating ? 'fill-dpc-yellow text-dpc-yellow' : 'text-neutral-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-sm text-text leading-relaxed">{rev.comment}</p>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
 

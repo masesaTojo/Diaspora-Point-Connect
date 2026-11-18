@@ -88,6 +88,14 @@ service cloud.firestore {
       );
     }
 
+    function isSupportStaff() {
+      return isEmailVerified() && (
+        request.auth.token.email == 'masesawilson3@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (hasUserDoc() && userRoles().hasAny(['SUPER_ADMIN', 'STORE_MANAGER', 'ORDER_MANAGER', 'SUPPORT_AGENT']))
+      );
+    }
+
     // --- VALIDATION BLUEPRINTS ---
     function isValidRoleList(roles) {
       return roles is list &&
@@ -380,6 +388,58 @@ service cloud.firestore {
              (!('endDate' in data) || (data.endDate is string && data.endDate.size() <= 64));
     }
 
+    function isValidSupportTicketCreate(data, ticketId) {
+      return data.keys().hasAll(['id', 'name', 'email', 'subject', 'message', 'status', 'createdAt', 'updatedAt']) &&
+             data.keys().hasOnly([
+               'id', 'customerId', 'name', 'email', 'phone', 'country',
+               'orderId', 'subject', 'message', 'source', 'status', 'createdAt', 'updatedAt'
+             ]) &&
+             data.id is string && data.id == ticketId &&
+             (!('customerId' in data) || (isSignedIn() && isEmailVerified() && data.customerId is string && data.customerId == request.auth.uid)) &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 32)) &&
+             (!('country' in data) || (data.country is string && data.country.size() <= 80)) &&
+             (!('orderId' in data) || (data.orderId is string && data.orderId.size() <= 128)) &&
+             data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 160 &&
+             data.message is string && data.message.size() >= 5 && data.message.size() <= 3000 &&
+             (!('source' in data) || data.source in ['SUPPORT_PAGE', 'CONTACT_PAGE', 'ABOUT_PAGE']) &&
+             data.status == 'OPEN' &&
+             isValidTimestampOrString(data.createdAt) &&
+             isValidTimestampOrString(data.updatedAt);
+    }
+
+    function isValidSupportTicketStaffUpdate(data, prev, ticketId) {
+      return data.keys().hasAll(['id', 'name', 'email', 'subject', 'message', 'status', 'createdAt', 'updatedAt']) &&
+             data.keys().hasOnly([
+               'id', 'customerId', 'name', 'email', 'phone', 'country',
+               'orderId', 'subject', 'message', 'source', 'status',
+               'resolutionNote', 'assignedToEmail', 'createdAt', 'updatedAt'
+             ]) &&
+             data.id == ticketId &&
+             data.id == prev.id &&
+             (!('customerId' in prev) || data.customerId == prev.customerId) &&
+             data.email == prev.email &&
+             data.createdAt == prev.createdAt &&
+             data.status in ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] &&
+             (!('resolutionNote' in data) || (data.resolutionNote is string && data.resolutionNote.size() <= 2000)) &&
+             (!('assignedToEmail' in data) || (data.assignedToEmail is string && data.assignedToEmail.size() <= 254)) &&
+             isValidTimestampOrString(data.updatedAt);
+    }
+
+    function isValidProductReview(data, revId) {
+      return data.keys().hasAll(['id', 'productId', 'userId', 'userName', 'rating', 'comment', 'createdAt']) &&
+             data.keys().hasOnly(['id', 'productId', 'userId', 'userName', 'rating', 'comment', 'verifiedPurchase', 'createdAt']) &&
+             data.id is string && data.id == revId &&
+             data.productId is string && data.productId.size() >= 1 && data.productId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 120 &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+             data.comment is string && data.comment.size() >= 3 && data.comment.size() <= 2000 &&
+             (!('verifiedPurchase' in data) || data.verifiedPurchase is bool) &&
+             isValidTimestampOrString(data.createdAt);
+    }
+
     // --- COLLECTION RULES ---
 
     // USERS (Self-registration restricted to CUSTOMER; role edits strictly SUPER_ADMIN)
@@ -516,6 +576,23 @@ service cloud.firestore {
       allow read: if true;
       allow create, update: if isValidId(id) && isMarketingAdmin() && isValidCampaign(incoming(), id);
       allow delete: if isValidId(id) && isMarketingAdmin();
+    }
+
+    // SUPPORT TICKETS (Validated customer/guest inquiry creation; owner read; support staff triage)
+    match /supportTickets/{ticketId} {
+      allow get: if (isSignedIn() && isEmailVerified() && 'customerId' in existing() && existing().customerId == request.auth.uid) || isSupportStaff();
+      allow list: if (isSignedIn() && isEmailVerified() && 'customerId' in existing() && existing().customerId == request.auth.uid) || isSupportStaff();
+      allow create: if isValidId(ticketId) && isValidSupportTicketCreate(incoming(), ticketId);
+      allow update: if isValidId(ticketId) && isSupportStaff() && isValidSupportTicketStaffUpdate(incoming(), existing(), ticketId);
+      allow delete: if false;
+    }
+
+    // PRODUCT REVIEWS (Public read; verified customer create; owner or catalog admin delete)
+    match /productReviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isEmailVerified() && isValidId(reviewId) && isValidProductReview(incoming(), reviewId);
+      allow update: if false;
+      allow delete: if isValidId(reviewId) && ((isSignedIn() && isEmailVerified() && existing().userId == request.auth.uid) || isCatalogAdmin());
     }
 
     // BOOT CONNECTION TEST DOCUMENT (Read-Only Non-Sensitive Ping)

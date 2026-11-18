@@ -21,15 +21,17 @@ import {
   RefreshCw,
   Check,
   Heart,
-  ShoppingBag
+  ShoppingBag,
+  MessageSquare,
+  ShieldCheck
 } from 'lucide-react';
-import { Order } from '@/src/types';
+import { Order, SupportTicket } from '@/src/types';
 import { Button } from '@/src/components/ui/Button';
 import { useShop } from '@/src/contexts/ShopContext';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { auth, db } from '@/src/lib/firebase';
-import { collection, deleteDoc, doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '@/src/lib/firestoreErrors';
+import { collection, deleteDoc, doc, onSnapshot, query, setDoc, where } from 'firebase/firestore';
+import { buildFirestoreErrorInfo, handleFirestoreError, OperationType } from '@/src/lib/firestoreErrors';
 
 interface SavedRecipient {
   id: string;
@@ -55,6 +57,10 @@ export default function Account() {
   const [recipients, setRecipients] = useState<SavedRecipient[]>([]);
   const [isEditingRecipient, setIsEditingRecipient] = useState<boolean>(false);
   const [currentRecipient, setCurrentRecipient] = useState<Partial<SavedRecipient>>({});
+
+  // Support Tickets State
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
@@ -118,6 +124,34 @@ export default function Account() {
       },
       (err) => {
         handleFirestoreError(err, OperationType.LIST, recipientsPath);
+      }
+    );
+    return () => unsubscribe();
+  }, [currentUser?.id]);
+
+  // Real-time Firestore sync for customer's support tickets
+  useEffect(() => {
+    if (!currentUser?.id || !auth.currentUser?.emailVerified) {
+      setTickets([]);
+      setTicketsError(null);
+      return;
+    }
+    const ticketsQuery = query(
+      collection(db, 'supportTickets'),
+      where('customerId', '==', currentUser.id)
+    );
+    const unsubscribe = onSnapshot(
+      ticketsQuery,
+      (snapshot) => {
+        const loaded = snapshot.docs
+          .map((d) => ({ id: d.id, ...d.data() } as SupportTicket))
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setTickets(loaded);
+        setTicketsError(null);
+      },
+      (err) => {
+        console.error('Support tickets listener error:', JSON.stringify(buildFirestoreErrorInfo(err, OperationType.LIST, 'supportTickets')));
+        setTicketsError('Support ticket history is temporarily unavailable.');
       }
     );
     return () => unsubscribe();
@@ -196,17 +230,17 @@ export default function Account() {
     ];
 
     let activeIndex = 0;
-    if (status === 'CONFIRMED') activeIndex = 0;
+    if (status === 'CONFIRMED' || status === 'PAYMENT_CONFIRMED' || status === 'NEW' || status === 'PAYMENT_PENDING') activeIndex = 0;
     else if (status === 'PROCESSING') activeIndex = 1;
     else if (status === 'DISPATCHED' || status === 'OUT_FOR_DELIVERY' || status === 'READY_FOR_DELIVERY') activeIndex = 2;
     else if (status === 'DELIVERED') activeIndex = 3;
-    else if (status === 'CANCELLED') activeIndex = -1;
+    else if (status === 'CANCELLED' || status === 'REFUNDED') activeIndex = -1;
 
-    if (status === 'CANCELLED') {
+    if (status === 'CANCELLED' || status === 'REFUNDED') {
       return (
         <div className="py-4 text-center">
           <div className="inline-flex items-center gap-2 bg-red-50 text-red-700 px-4 py-2 rounded-lg font-semibold text-sm border border-red-200">
-            <AlertCircle className="w-4 h-4" /> This order has been cancelled.
+            <AlertCircle className="w-4 h-4" /> This order has been {status.toLowerCase()}.
           </div>
         </div>
       );
@@ -323,6 +357,17 @@ export default function Account() {
                   className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors ${activeTab === 'addresses' ? 'bg-blue-50 text-dpc-blue font-semibold' : 'text-text hover:bg-neutral-50'}`}
                 >
                   <MapPin className="w-5 h-5" /> Saved Addresses
+                </button>
+                <button 
+                  onClick={() => { setActiveTab('tickets'); setSelectedOrder(null); }}
+                  className={`w-full text-left px-4 py-3 rounded-lg flex items-center justify-between transition-colors ${activeTab === 'tickets' ? 'bg-blue-50 text-dpc-blue font-semibold' : 'text-text hover:bg-neutral-50'}`}
+                >
+                  <span className="flex items-center gap-3">
+                    <MessageSquare className="w-5 h-5" /> Support Tickets
+                  </span>
+                  <span className="text-xs bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full font-bold">
+                    {tickets.length}
+                  </span>
                 </button>
               </nav>
             </div>
@@ -527,10 +572,19 @@ export default function Account() {
                             {selectedOrder.deliveryDate && (
                               <p><span className="text-text-muted">Delivery Date:</span> <span className="font-medium text-navy">{selectedOrder.deliveryDate}</span></p>
                             )}
+                            {selectedOrder.expectedDeliveryTime && (
+                              <p><span className="text-text-muted">Delivery ETA:</span> <span className="font-medium text-dpc-blue">{selectedOrder.expectedDeliveryTime}</span></p>
+                            )}
                             {selectedOrder.deliveryNotes && (
                               <p className="text-xs italic text-text-muted mt-1 bg-neutral-50 p-1.5 rounded border border-neutral-100">
                                 Notes: "{selectedOrder.deliveryNotes}"
                               </p>
+                            )}
+                            {selectedOrder.proofOfDelivery && (
+                              <div className="mt-2 pt-2 border-t border-neutral-100 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                                <ShieldCheck className="w-4 h-4 shrink-0" />
+                                <span>Delivery Proof: {selectedOrder.proofOfDelivery}</span>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -804,6 +858,103 @@ export default function Account() {
                   </div>
                 ) : (
                   <Button onClick={login}>Sign in with Google</Button>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'tickets' && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-display font-bold text-navy mb-1">Support Tickets</h2>
+                    <p className="text-text-muted text-sm">Track concierge responses for your delivery inquiries and assistance requests.</p>
+                  </div>
+                  <Link to="/support">
+                    <Button className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" /> Open New Ticket
+                    </Button>
+                  </Link>
+                </div>
+
+                {ticketsError && (
+                  <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{ticketsError}</span>
+                  </div>
+                )}
+
+                {!currentUser && !authLoading ? (
+                  <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center shadow-sm">
+                    <MessageSquare className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-navy mb-2">Sign in to view your support tickets</h3>
+                    <p className="text-text-muted mb-6">Your support conversations are private to your verified Google account.</p>
+                    <Button size="lg" onClick={login}>Sign in with Google</Button>
+                  </div>
+                ) : tickets.length === 0 ? (
+                  <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center shadow-sm">
+                    <MessageSquare className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-navy mb-2">No support tickets yet</h3>
+                    <p className="text-text-muted mb-6">Need help coordinating a surprise gift or checking delivery timing? Reach out to our Nairobi concierge desk.</p>
+                    <Link to="/support">
+                      <Button variant="outline">Contact Concierge Support</Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {tickets.map((ticket) => {
+                      const badgeColor =
+                        ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'
+                          ? 'bg-green-100 text-green-800 border-green-200'
+                          : ticket.status === 'IN_PROGRESS'
+                            ? 'bg-blue-100 text-blue-800 border-blue-200'
+                            : 'bg-amber-100 text-amber-800 border-amber-200';
+                      return (
+                        <div key={ticket.id} className="bg-white rounded-xl border border-neutral-200 p-6 shadow-sm space-y-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 pb-4">
+                            <div>
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                <span className="font-mono text-xs font-bold text-dpc-blue bg-blue-50 px-2 py-0.5 rounded">
+                                  {ticket.id}
+                                </span>
+                                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${badgeColor}`}>
+                                  {ticket.status.replace(/_/g, ' ')}
+                                </span>
+                                {ticket.orderId && (
+                                  <Link
+                                    to={`/track?orderId=${encodeURIComponent(ticket.orderId)}`}
+                                    className="text-xs font-medium text-navy underline hover:text-dpc-blue"
+                                  >
+                                    Order #{ticket.orderId}
+                                  </Link>
+                                )}
+                              </div>
+                              <h3 className="font-bold text-navy text-lg mt-2">{ticket.subject}</h3>
+                            </div>
+                            <span className="text-xs text-text-muted">
+                              {new Date(ticket.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+
+                          <p className="text-sm text-text whitespace-pre-line">{ticket.message}</p>
+
+                          {ticket.resolutionNote && (
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-sm">
+                              <p className="font-bold text-emerald-900 mb-1 flex items-center gap-1.5">
+                                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                Concierge Update
+                                {ticket.assignedToEmail && (
+                                  <span className="text-xs font-normal text-emerald-700 ml-1">
+                                    ({ticket.assignedToEmail})
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-emerald-900 whitespace-pre-line">{ticket.resolutionNote}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             )}

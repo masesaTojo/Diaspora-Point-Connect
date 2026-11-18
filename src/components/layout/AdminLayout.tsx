@@ -26,7 +26,8 @@ import {
   Database,
   LogIn,
   ShieldAlert,
-  Loader2
+  Loader2,
+  Headphones
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { Button } from '@/src/components/ui/Button';
@@ -62,6 +63,7 @@ const navGroups: { category: string; items: NavItem[] }[] = [
     items: [
       { name: 'Suppliers', path: '/admin/suppliers', icon: Briefcase, roles: ADMIN_ROUTE_ROLES.suppliers },
       { name: 'Customers', path: '/admin/customers', icon: Users, roles: ADMIN_ROUTE_ROLES.customers },
+      { name: 'Support Desk', path: '/admin/support', icon: Headphones, roles: ADMIN_ROUTE_ROLES.support },
       { name: 'Marketing', path: '/admin/marketing', icon: Megaphone, roles: ADMIN_ROUTE_ROLES.marketing },
     ]
   },

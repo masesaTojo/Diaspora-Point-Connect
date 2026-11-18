@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { CustomerLayout } from './components/layout/CustomerLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
 import { ShopProvider } from './contexts/ShopContext';
@@ -21,6 +21,7 @@ import FAQ from './pages/customer/FAQ';
 import Shipping from './pages/customer/Shipping';
 import Returns from './pages/customer/Returns';
 import AboutUs from './pages/customer/AboutUs';
+import HowItWorks from './pages/customer/HowItWorks';
 
 // Admin Pages
 import Dashboard from './pages/admin/Dashboard';
@@ -36,6 +37,7 @@ import GiftBuilderManager from './pages/admin/GiftBuilderManager';
 import Analytics from './pages/admin/Analytics';
 import Settings from './pages/admin/Settings';
 import SystemMigration from './pages/admin/SystemMigration';
+import SupportDesk from './pages/admin/SupportDesk';
 
 export default function App() {
   return (
@@ -58,10 +60,48 @@ export default function App() {
             <Route path="about-us" element={<AboutUs />} />
             <Route path="support" element={<Support />} />
             <Route path="contact" element={<AboutUs />} />
+            <Route path="how-it-works" element={<HowItWorks />} />
             <Route path="track" element={<TrackOrder />} />
+            <Route path="track-order" element={<TrackOrder />} />
             <Route path="faq" element={<FAQ />} />
             <Route path="shipping" element={<Shipping />} />
             <Route path="returns" element={<Returns />} />
+            <Route
+              path="*"
+              element={
+                <div className="min-h-[65vh] bg-neutral-bg flex flex-col items-center justify-center px-4 py-16 text-center">
+                  <span className="text-xs font-bold uppercase tracking-widest text-dpc-blue bg-blue-50 px-3 py-1 rounded-full mb-4">
+                    404 — Page Not Found
+                  </span>
+                  <h1 className="text-3xl md:text-4xl font-display font-bold text-navy mb-3">
+                    We couldn&apos;t find that page
+                  </h1>
+                  <p className="text-text-muted max-w-md mb-8 text-sm">
+                    The link you followed may have moved or expired. Explore our curated gifts for Kenya or track an active order below.
+                  </p>
+                  <div className="flex flex-wrap gap-3 justify-center">
+                    <Link
+                      to="/shop"
+                      className="px-6 py-3 rounded-lg bg-dpc-blue text-white font-semibold text-sm hover:bg-dpc-blue-dark transition-colors"
+                    >
+                      Browse Gift Catalog
+                    </Link>
+                    <Link
+                      to="/track"
+                      className="px-6 py-3 rounded-lg border border-neutral-300 bg-white text-navy font-semibold text-sm hover:bg-neutral-50 transition-colors"
+                    >
+                      Track an Order
+                    </Link>
+                    <Link
+                      to="/"
+                      className="px-6 py-3 rounded-lg text-navy font-semibold text-sm hover:underline"
+                    >
+                      Return Home
+                    </Link>
+                  </div>
+                </div>
+              }
+            />
           </Route>
 
         {/* Control Center Routes */}
@@ -80,6 +120,7 @@ export default function App() {
           <Route path="logistics" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.logistics}><Logistics /></RequireRole>} />
           <Route path="suppliers" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.suppliers}><Suppliers /></RequireRole>} />
           <Route path="customers" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.customers}><Customers /></RequireRole>} />
+          <Route path="support" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.support}><SupportDesk /></RequireRole>} />
           <Route path="marketing" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.marketing}><Marketing /></RequireRole>} />
           <Route path="content" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.content}><Content /></RequireRole>} />
           <Route path="gift-builder" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.giftBuilder}><GiftBuilderManager /></RequireRole>} />
@@ -88,8 +129,15 @@ export default function App() {
           <Route path="settings" element={<RequireRole allowedRoles={ADMIN_ROUTE_ROLES.settings}><Settings /></RequireRole>} />
         </Route>
 
-        {/* 404 Route */}
-        <Route path="*" element={<div className="min-h-screen flex items-center justify-center text-xl text-navy">404 - Page Not Found</div>} />
+        {/* Unmatched Admin Routes Fallback */}
+        <Route
+          path="/admin/*"
+          element={
+            <RequireRole allowedRoles={STAFF_ROLES} title="Control Center">
+              <AdminLayout />
+            </RequireRole>
+          }
+        />
       </Routes>
         </BrowserRouter>
       </ShopProvider>

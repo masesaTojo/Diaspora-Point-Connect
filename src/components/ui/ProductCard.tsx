@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Product } from '@/src/types';
 import { Card } from './Card';
 import { Badge } from './Badge';
-import { Heart, ShoppingBag, Star } from 'lucide-react';
+import { Check, Heart, ShoppingBag, Star } from 'lucide-react';
 import { useShop } from '@/src/contexts/ShopContext';
 
 interface ProductCardProps {
@@ -12,10 +12,13 @@ interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { wishlist, toggleWishlist, addToCart, convertPrice } = useShop();
-  
-  // Safe default for ID
+  const [justAdded, setJustAdded] = useState(false);
+
   const productId = product.id || '';
   const isWishlisted = wishlist.includes(productId);
+  const isOutOfStock =
+    product.availability === 'OUT_OF_STOCK' ||
+    (typeof product.inventory === 'number' && product.inventory <= 0);
 
   const handleWishlist = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -24,11 +27,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (productId) {
+    if (productId && !isOutOfStock) {
       addToCart({
         productId,
         quantity: 1
       });
+      setJustAdded(true);
+      setTimeout(() => setJustAdded(false), 1500);
     }
   };
 
@@ -48,11 +53,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           {product.isNewArrival && (
             <Badge variant="default" className="bg-dpc-blue text-white shadow-sm">New</Badge>
           )}
+          {isOutOfStock && (
+            <Badge variant="default" className="bg-red-600 text-white shadow-sm">Out of Stock</Badge>
+          )}
         </div>
       </Link>
       
       <button 
+        type="button"
         onClick={handleWishlist}
+        aria-label={isWishlisted ? `Remove ${product.name || 'product'} from wishlist` : `Save ${product.name || 'product'} to wishlist`}
         className="absolute top-3 right-3 h-9 w-9 rounded-full bg-white/80 backdrop-blur-sm shadow flex items-center justify-center text-navy hover:bg-white hover:text-red-500 transition-colors z-10"
       >
         <Heart className={`w-5 h-5 ${isWishlisted ? 'fill-red-500 text-red-500' : ''}`} />
@@ -87,13 +97,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               <span>{convertPrice(product.price || 0)}</span>
             )}
           </div>
-          <button             onClick={handleAddToCart}
-            disabled={product.availability === 'OUT_OF_STOCK'} className={`h-10 w-10 rounded-full flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-dpc-blue focus:ring-offset-2 ${product.availability === 'OUT_OF_STOCK' ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed' : 'bg-neutral-100 text-navy hover:bg-dpc-blue hover:text-white'}`}
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            disabled={isOutOfStock}
+            aria-label={isOutOfStock ? `${product.name || 'Product'} is out of stock` : `Add ${product.name || 'product'} to cart`}
+            className={`h-10 w-10 rounded-full flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-dpc-blue focus:ring-offset-2 ${
+              isOutOfStock
+                ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
+                : justAdded
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-neutral-100 text-navy hover:bg-dpc-blue hover:text-white'
+            }`}
           >
-            <ShoppingBag className="w-5 h-5" />
+            {justAdded ? <Check className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
           </button>
         </div>
       </div>
     </Card>
   );
-}
+};

@@ -184,6 +184,33 @@ test('PaymentTransactions collection is strictly server-written and owner/staff 
   assert.match(staffUpdateFn, /'paidAt'/);
 });
 
+test('Phase 4 supportTickets and productReviews collections enforce least-privilege RBAC and validation', () => {
+  const isSupportStaffFn = extractFunctionBlock(rulesContent, 'function isSupportStaff()');
+  assert.match(isSupportStaffFn, /'SUPPORT_AGENT'/);
+  assert.match(isSupportStaffFn, /'ORDER_MANAGER'/);
+  assert.match(isSupportStaffFn, /'STORE_MANAGER'/);
+
+  const ticketsBlock = extractMatchBlock(rulesContent, 'match /supportTickets/{ticketId}');
+  assert.doesNotMatch(ticketsBlock, /allow read:\s*if true/);
+  assert.doesNotMatch(ticketsBlock, /allow write:\s*if true/);
+  assert.match(ticketsBlock, /'customerId' in existing\(\)/);
+  assert.match(ticketsBlock, /isSupportStaff\(\)/);
+  assert.match(ticketsBlock, /isValidSupportTicketCreate\(incoming\(\), ticketId\)/);
+  assert.match(ticketsBlock, /isValidSupportTicketStaffUpdate\(incoming\(\), existing\(\), ticketId\)/);
+  assert.match(ticketsBlock, /allow delete:\s*if false;/);
+
+  const ticketCreateFn = extractFunctionBlock(rulesContent, 'function isValidSupportTicketCreate(data, ticketId)');
+  assert.match(ticketCreateFn, /data\.status == 'OPEN'/);
+  assert.match(ticketCreateFn, /data\.customerId == request\.auth\.uid/);
+
+  const reviewsBlock = extractMatchBlock(rulesContent, 'match /productReviews/{reviewId}');
+  assert.match(reviewsBlock, /allow read:\s*if true;/);
+  assert.match(reviewsBlock, /isSignedIn\(\) && isEmailVerified\(\)/);
+  assert.match(reviewsBlock, /isValidProductReview\(incoming\(\), reviewId\)/);
+  assert.match(reviewsBlock, /allow update:\s*if false;/);
+  assert.match(reviewsBlock, /existing\(\)\.userId == request\.auth\.uid\)? \|\| isCatalogAdmin\(\)/);
+});
+
 test('firebase-blueprint.json documents all protected collections in firestore.rules', () => {
   const blueprint = JSON.parse(fs.readFileSync(blueprintPath, 'utf8'));
   const expectedCollections = [
@@ -205,6 +232,8 @@ test('firebase-blueprint.json documents all protected collections in firestore.r
     'campaigns',
     'cmsSections',
     'config',
+    'supportTickets',
+    'productReviews',
   ];
   for (const col of expectedCollections) {
     assert.ok(blueprint.firestore?.[col], `Missing "${col}" in firebase-blueprint.json`);
